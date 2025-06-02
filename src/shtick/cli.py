@@ -8,6 +8,7 @@ import sys
 import argparse
 from shtick.commands import ShtickCommands
 from shtick.display import DisplayCommands
+from shtick.logger import setup_logging
 
 
 def main():
@@ -125,6 +126,9 @@ def main():
 
     args = parser.parse_args()
 
+    # Set up logging first
+    logger = setup_logging(debug=args.debug)
+
     if not args.command:
         # Show helpful getting started message
         parser.print_help()
@@ -134,39 +138,51 @@ def main():
         print("  shtick list                   # List all items")
         sys.exit(1)
 
-    # Initialize command handlers
+    # Initialize command handlers with debug flag
     commands = ShtickCommands(debug=args.debug)
     display = DisplayCommands(debug=args.debug)
 
     # Route commands
-    if args.command == "generate":
-        commands.generate(args.config, args.terse)
-    elif args.command == "add":
-        commands.add_item(args.type, args.group, args.assignment)
-    elif args.command == "add-persistent":
-        commands.add_persistent(args.type, args.assignment)
-    elif args.command == "alias":
-        commands.add_persistent("alias", args.assignment)
-    elif args.command == "env":
-        commands.add_persistent("env", args.assignment)
-    elif args.command == "function":
-        commands.add_persistent("function", args.assignment)
-    elif args.command == "remove":
-        commands.remove_item(args.type, args.group, args.search)
-    elif args.command == "remove-persistent":
-        commands.remove_item(args.type, "persistent", args.search)
-    elif args.command == "activate":
-        commands.activate_group(args.group)
-    elif args.command == "deactivate":
-        commands.deactivate_group(args.group)
-    elif args.command == "status":
-        display.status()
-    elif args.command == "list":
-        display.list_config(args.long)
-    elif args.command == "shells":
-        display.shells(args.long)
-    elif args.command == "source":
-        commands.source_command(args.shell)
+    try:
+        if args.command == "generate":
+            commands.generate(args.config, args.terse)
+        elif args.command == "add":
+            commands.add_item(args.type, args.group, args.assignment)
+        elif args.command == "add-persistent":
+            commands.add_persistent(args.type, args.assignment)
+        elif args.command == "alias":
+            commands.add_persistent("alias", args.assignment)
+        elif args.command == "env":
+            commands.add_persistent("env", args.assignment)
+        elif args.command == "function":
+            commands.add_persistent("function", args.assignment)
+        elif args.command == "remove":
+            commands.remove_item(args.type, args.group, args.search)
+        elif args.command == "remove-persistent":
+            commands.remove_item(args.type, "persistent", args.search)
+        elif args.command == "activate":
+            commands.activate_group(args.group)
+        elif args.command == "deactivate":
+            commands.deactivate_group(args.group)
+        elif args.command == "status":
+            display.status()
+        elif args.command == "list":
+            display.list_config(args.long)
+        elif args.command == "shells":
+            display.shells(args.long)
+        elif args.command == "source":
+            commands.source_command(args.shell)
+
+    except KeyboardInterrupt:
+        logger.debug("Operation cancelled by user")
+        print("\nCancelled")
+        sys.exit(1)
+    except Exception as e:
+        if args.debug:
+            logger.exception("Unhandled exception")
+        else:
+            logger.error(f"Error: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

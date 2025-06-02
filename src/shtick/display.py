@@ -4,235 +4,219 @@ Display commands for shtick CLI - handles listing, status, and informational out
 
 import os
 import sys
+import logging
 from shtick.config import Config
 from shtick.shells import get_supported_shells
+from shtick.shtick import ShtickManager
+
+logger = logging.getLogger("shtick")
 
 
 class DisplayCommands:
     """Handles all display/listing commands for shtick"""
 
     def __init__(self, debug: bool = False):
-        self.debug = debug
+        # Set up logging
+        if debug:
+            logging.basicConfig(
+                level=logging.DEBUG, format="%(name)s - %(levelname)s - %(message)s"
+            )
+        else:
+            logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+        self.manager = ShtickManager(debug=debug)
 
     def get_current_shell(self):
-        """Detect the current shell"""
-        shell_path = os.environ.get("SHELL", "")
-        return os.path.basename(shell_path) if shell_path else None
+        """Use cached shell detection from Config"""
+        return Config.get_current_shell()
 
     def status(self):
         """Show status of groups and active state"""
-        config_path = Config.get_default_config_path()
+        status = self.manager.get_status()
 
-        try:
-            config = Config(config_path, debug=self.debug)
-            config.load()
-
-            persistent_group = config.get_persistent_group()
-            regular_groups = config.get_regular_groups()
-            active_groups = config.load_active_groups()
-
-            print("Shtick Status")
-            print("=" * 40)
-
-            # Show current shell integration status
-            current_shell = self.get_current_shell()
-            if current_shell:
-                print(f"Current shell: {current_shell}")
-                loader_path = os.path.expanduser(
-                    f"~/.config/shtick/load_active.{current_shell}"
-                )
-                if os.path.exists(loader_path):
-                    print(f"Loader file: ✓ exists")
-                else:
-                    print(f"Loader file: ✗ missing (run 'shtick generate')")
-            print()
-
-            # Show persistent group
-            if persistent_group:
-                total_persistent = (
-                    len(persistent_group.aliases)
-                    + len(persistent_group.env_vars)
-                    + len(persistent_group.functions)
-                )
-                print(f"Persistent (always active): {total_persistent} items")
-            else:
-                print("Persistent: No items")
-
-            print()
-
-            # Show regular groups
-            if regular_groups:
-                print("Available Groups:")
-                for group in regular_groups:
-                    status = "ACTIVE" if group.name in active_groups else "inactive"
-                    total_items = (
-                        len(group.aliases) + len(group.env_vars) + len(group.functions)
-                    )
-                    print(f"  {group.name}: {total_items} items ({status})")
-            else:
-                print("No regular groups configured")
-
-            print()
-
-            # Show summary
-            if active_groups:
-                print(f"Currently active: {', '.join(active_groups)}")
-            else:
-                print("No groups currently active")
-
-            print()
-            print("Quick commands:")
-            print("  shtick alias ll='ls -la'              # Add persistent alias")
-            print("  shtick activate <group>               # Activate group")
-            print('  eval "$(shtick source)"               # Load changes now')
-
-        except FileNotFoundError:
-            print(f"Config file not found: {config_path}")
-            print("No configuration exists yet")
+        if "error" in status:
+            print(f"Error loading configuration: {status['error']}")
             print("\nGet started with:")
             print("  shtick alias ll='ls -la'")
-        except Exception as e:
-            print(f"Error: {e}")
-            sys.exit(1)
+            return
+
+        print("Shtick Status")
+        print("=" * 40)
+
+        # Show current shell integration status
+        if status["current_shell"]:
+            print(f"Current shell: {status['current_shell']}")
+            if status["loader_exists"]:
+                print(f"Loader file: ✓ exists")
+            else:
+                print(f"Loader file: ✗ missing (run 'shtick generate')")
+        print()
+
+        # Show persistent group
+        if status["persistent_items"] > 0:
+            print(f"Persistent (always active): {status['persistent_items']} items")
+        else:
+            print("Persistent: No items")
+
+        print()
+
+        # Show regular groups
+        if status["available_groups"]:
+            print("Available Groups:")
+            active_set = set(status["active_groups"])
+            for group_name in status["available_groups"]:
+                # Get item count for this group
+                items = self.manager.list_items(group_name)
+                item_count = len(items)
+                status_str = "ACTIVE" if group_name in active_set else "inactive"
+                print(f"  {group_name}: {item_count} items ({status_str})")
+        else:
+            print("No regular groups configured")
+
+        print()
+
+        # Show summary
+        if status["active_groups"]:
+            print(f"Currently active: {', '.join(status['active_groups'])}")
+        else:
+            print("No groups currently active")
+
+        print()
+        print("Quick commands:")
+        print("  shtick alias ll='ls -la'              # Add persistent alias")
+        print("  shtick activate <group>               # Activate group")
+        print('  eval "$(shtick source)"               # Load changes now')
 
     def list_config(self, long_format: bool = False):
         """List current configuration"""
-        config_path = Config.get_default_config_path()
-
-        try:
-            config = Config(config_path, debug=self.debug)
-            config.load()
-
-            if not config.groups:
-                print("No groups configured")
-                print("\nGet started with:")
-                print("  shtick alias ll='ls -la'              # Add persistent alias")
-                print("  shtick add alias work ll='ls -la'     # Add to 'work' group")
-                print("  shtick activate work                  # Activate 'work' group")
-                return
-
-            persistent_group = config.get_persistent_group()
-            regular_groups = config.get_regular_groups()
-            active_groups = config.load_active_groups()
-
-            if long_format:
-                self._print_detailed_list(
-                    persistent_group, regular_groups, active_groups
-                )
-            else:
-                self._print_tabular_list(
-                    persistent_group, regular_groups, active_groups
-                )
-
-        except FileNotFoundError:
-            print(f"Config file not found: {config_path}")
-            print("Use 'shtick alias <key>=<value>' to create your first alias")
-        except Exception as e:
-            print(f"Error: {e}")
-            sys.exit(1)
-
-    def _print_detailed_list(self, persistent_group, regular_groups, active_groups):
-        """Print detailed line-by-line list format"""
-        # Show persistent group first
-        if persistent_group:
-            print("Group: persistent (always active)")
-            self._print_group_items(persistent_group)
-            print()
-
-        # Show regular groups
-        for group in regular_groups:
-            status = " (ACTIVE)" if group.name in active_groups else " (inactive)"
-            print(f"Group: {group.name}{status}")
-            self._print_group_items(group)
-            print()
-
-    def _print_group_items(self, group):
-        """Print items for a single group"""
-        if group.aliases:
-            print(f"  Aliases ({len(group.aliases)}):")
-            for key, value in group.aliases.items():
-                print(f"    {key} = {value}")
-        if group.env_vars:
-            print(f"  Environment Variables ({len(group.env_vars)}):")
-            for key, value in group.env_vars.items():
-                print(f"    {key} = {value}")
-        if group.functions:
-            print(f"  Functions ({len(group.functions)}):")
-            for key, value in group.functions.items():
-                print(f"    {key} = {value}")
-
-    def _print_tabular_list(self, persistent_group, regular_groups, active_groups):
-        """Print compact tabular list format"""
-        # Collect all items for tabular display
-        items = []
-
-        # Add persistent items
-        if persistent_group:
-            items.extend(self._collect_group_items(persistent_group, "PERSISTENT"))
-
-        # Add regular group items
-        for group in regular_groups:
-            status = "ACTIVE" if group.name in active_groups else "inactive"
-            items.extend(self._collect_group_items(group, status))
+        items = self.manager.list_items()
 
         if not items:
             print("No items configured")
+            print("\nGet started with:")
+            print("  shtick alias ll='ls -la'              # Add persistent alias")
+            print("  shtick add alias work ll='ls -la'     # Add to 'work' group")
+            print("  shtick activate work                  # Activate 'work' group")
             return
 
-        self._print_table(items)
-        self._print_summary(items, active_groups)
+        # Group items by group name
+        groups_data = {}
+        for item in items:
+            group_name = item["group"]
+            if group_name not in groups_data:
+                groups_data[group_name] = {
+                    "aliases": {},
+                    "env_vars": {},
+                    "functions": {},
+                    "active": item["active"],
+                }
 
-    def _collect_group_items(self, group, status):
-        """Collect items from a group for tabular display"""
-        items = []
-        for key, value in group.aliases.items():
-            items.append((group.name, "alias", key, value, status))
-        for key, value in group.env_vars.items():
-            items.append((group.name, "env", key, value, status))
-        for key, value in group.functions.items():
-            items.append((group.name, "function", key, value, status))
-        return items
+            if item["type"] == "alias":
+                groups_data[group_name]["aliases"][item["key"]] = item["value"]
+            elif item["type"] == "env":
+                groups_data[group_name]["env_vars"][item["key"]] = item["value"]
+            elif item["type"] == "function":
+                groups_data[group_name]["functions"][item["key"]] = item["value"]
 
-    def _print_table(self, items):
-        """Print items in tabular format"""
+        # Display based on format
+        if long_format:
+            self._print_detailed_list(groups_data)
+        else:
+            self._print_tabular_list(items)
+
+    def _print_detailed_list(self, groups_data):
+        """Print detailed line-by-line list format"""
+        # Show persistent group first if it exists
+        if "persistent" in groups_data:
+            print("Group: persistent (always active)")
+            self._print_group_items_detailed(groups_data["persistent"])
+            print()
+            del groups_data["persistent"]
+
+        # Show regular groups
+        for group_name, group_data in sorted(groups_data.items()):
+            status = " (ACTIVE)" if group_data["active"] else " (inactive)"
+            print(f"Group: {group_name}{status}")
+            self._print_group_items_detailed(group_data)
+            print()
+
+    def _print_group_items_detailed(self, group_data):
+        """Print items for a single group in detailed format"""
+        if group_data["aliases"]:
+            print(f"  Aliases ({len(group_data['aliases'])}):")
+            for key, value in group_data["aliases"].items():
+                print(f"    {key} = {value}")
+        if group_data["env_vars"]:
+            print(f"  Environment Variables ({len(group_data['env_vars'])}):")
+            for key, value in group_data["env_vars"].items():
+                print(f"    {key} = {value}")
+        if group_data["functions"]:
+            print(f"  Functions ({len(group_data['functions'])}):")
+            for key, value in group_data["functions"].items():
+                print(f"    {key} = {value}")
+
+    def _print_tabular_list(self, items):
+        """Print compact tabular list format"""
+        if not items:
+            return
+
         # Calculate column widths
-        max_group = max(max(len(item[0]) for item in items), 5)  # "Group"
-        max_type = max(max(len(item[1]) for item in items), 4)  # "Type"
-        max_key = max(max(len(item[2]) for item in items), 3)  # "Key"
+        max_group = max(max(len(item["group"]) for item in items), 5)  # "Group"
+        max_type = max(max(len(item["type"]) for item in items), 4)  # "Type"
+        max_key = max(max(len(item["key"]) for item in items), 3)  # "Key"
         max_value = max(
-            max(min(len(item[3]), 50) for item in items), 5
+            max(min(len(item["value"]), 50) for item in items), 5
         )  # "Value" (limited)
-        max_status = max(max(len(item[4]) for item in items), 6)  # "Status"
+        max_status = max(
+            max(len("ACTIVE" if item["active"] else "inactive") for item in items), 6
+        )  # "Status"
 
         # Print header
         header = f"{'Group':<{max_group}} {'Type':<{max_type}} {'Key':<{max_key}} {'Value':<{max_value}} {'Status':<{max_status}}"
         print(header)
         print("-" * len(header))
 
+        # Sort items for better display (persistent first, then by group, then by type)
+        def sort_key(item):
+            group_order = 0 if item["group"] == "persistent" else 1
+            return (group_order, item["group"], item["type"], item["key"])
+
+        sorted_items = sorted(items, key=sort_key)
+
         # Print items
-        for group, item_type, key, value, status in items:
+        for item in sorted_items:
             # Truncate long values with ellipsis
+            value = item["value"]
             display_value = (
                 value if len(value) <= max_value else value[: max_value - 3] + "..."
             )
+            status = "ACTIVE" if item["active"] else "inactive"
             print(
-                f"{group:<{max_group}} {item_type:<{max_type}} {key:<{max_key}} {display_value:<{max_value}} {status:<{max_status}}"
+                f"{item['group']:<{max_group}} {item['type']:<{max_type}} "
+                f"{item['key']:<{max_key}} {display_value:<{max_value}} {status:<{max_status}}"
             )
 
-    def _print_summary(self, items, active_groups):
+        # Print summary
+        self._print_summary(items)
+
+    def _print_summary(self, items):
         """Print summary information"""
         print()
         total_items = len(items)
-        active_items = len(
-            [item for item in items if item[4] in ["ACTIVE", "PERSISTENT"]]
-        )
+        active_items = len([item for item in items if item["active"]])
         print(f"Total: {total_items} items ({active_items} active)")
 
         # Show available commands
         print()
         print("Use 'shtick list -l' for detailed view")
-        if any(item[4] == "inactive" for item in items):
-            inactive_groups = set(item[0] for item in items if item[4] == "inactive")
+
+        # Get inactive groups
+        inactive_groups = set()
+        for item in items:
+            if not item["active"] and item["group"] != "persistent":
+                inactive_groups.add(item["group"])
+
+        if inactive_groups:
             print(f"Activate groups with: shtick activate <group>")
             print(f"Inactive groups: {', '.join(sorted(inactive_groups))}")
 
