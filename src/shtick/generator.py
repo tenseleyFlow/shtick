@@ -72,7 +72,7 @@ class Generator:
 
                     f.write(line)
 
-    def generate_all(self, config: Config) -> None:
+    def generate_all(self, config: Config, interactive: bool = False) -> None:
         """Generate shell files for all groups in config"""
         if not config.groups:
             print("No groups found in configuration")
@@ -87,7 +87,7 @@ class Generator:
         self.generate_loader(config)
 
         print(f"All done! Files generated in {self.output_base_dir}")
-        self._print_usage_instructions(config)
+        self._print_usage_instructions(config, interactive)
 
     def generate_loader(self, config: Config) -> None:
         """Generate dynamic loader files that source persistent + active groups"""
@@ -112,9 +112,15 @@ class Generator:
                 if persistent_group:
                     f.write("# Load persistent configuration\n")
                     for item_type in ["alias", "env", "function"]:
-                        file_path = f"$HOME/.config/shtick/persistent/{item_type}"
-                        f.write(f'[ -f "{file_path}/{item_type}s.{shell_name}" ] && ')
-                        f.write(f'source "{file_path}/{item_type}s.{shell_name}"\n')
+                        # Map item_type to the actual filename prefix
+                        prefix_map = {
+                            "alias": "aliases",
+                            "env": "envvars",
+                            "function": "functions",
+                        }
+                        prefix = prefix_map[item_type]
+                        file_path = f"$HOME/.config/shtick/persistent/{item_type}/{prefix}.{shell_name}"
+                        f.write(f'[ -f "{file_path}" ] && source "{file_path}"\n')
                     f.write("\n")
 
                 # Source active groups
@@ -123,25 +129,30 @@ class Generator:
                     for group_name in active_groups:
                         f.write(f"# Group: {group_name}\n")
                         for item_type in ["alias", "env", "function"]:
-                            file_path = f"$HOME/.config/shtick/{group_name}/{item_type}"
-                            f.write(
-                                f'[ -f "{file_path}/{item_type}s.{shell_name}" ] && '
-                            )
-                            f.write(f'source "{file_path}/{item_type}s.{shell_name}"\n')
+                            # Map item_type to the actual filename prefix
+                            prefix_map = {
+                                "alias": "aliases",
+                                "env": "envvars",
+                                "function": "functions",
+                            }
+                            prefix = prefix_map[item_type]
+                            file_path = f"$HOME/.config/shtick/{group_name}/{item_type}/{prefix}.{shell_name}"
+                            f.write(f'[ -f "{file_path}" ] && source "{file_path}"\n')
                         f.write("\n")
                 else:
                     f.write("# No active groups\n")
 
-    def _print_usage_instructions(self, config: Config) -> None:
+    def _print_usage_instructions(
+        self, config: Config, interactive: bool = False
+    ) -> None:
         """Print usage instructions for the user"""
         active_groups = config.load_active_groups()
         persistent_group = config.get_persistent_group()
 
-        print("\nTo use these configurations, add this line to your shell config:")
-        print("  # For bash/zsh (~/.bashrc or ~/.zshrc):")
-        print("  source ~/.config/shtick/load_active.bash")
-        print("\n  # For fish (~/.config/fish/config.fish):")
-        print("  source ~/.config/shtick/load_active.fish")
+        if interactive:
+            self._interactive_shell_setup()
+        else:
+            self._print_default_instructions()
 
         if persistent_group:
             total_persistent = (
@@ -161,6 +172,136 @@ class Generator:
         available_groups = [g.name for g in config.get_regular_groups()]
         if available_groups:
             print(f"Available groups: {', '.join(available_groups)}")
+
+    def _print_default_instructions(self) -> None:
+        """Print default sourcing instructions"""
+        print("\nTo use these configurations, add this line to your shell config:")
+        print("  # For bash/zsh (~/.bashrc or ~/.zshrc):")
+        print("  source ~/.config/shtick/load_active.bash")
+        print("\n  # For fish (~/.config/fish/config.fish):")
+        print("  source ~/.config/shtick/load_active.fish")
+
+    def _interactive_shell_setup(self) -> None:
+        """Interactive shell selection for sourcing instructions"""
+        from shtick.shells import get_supported_shells
+
+        print("\nSelect shells to show sourcing instructions for:")
+        print("(You can specify multiple shells by number or name, space-separated)")
+        print()
+
+        shells = sorted(get_supported_shells())
+        shell_configs = {
+            "bash": ("~/.bashrc", "source ~/.config/shtick/load_active.bash"),
+            "zsh": ("~/.zshrc", "source ~/.config/shtick/load_active.zsh"),
+            "fish": (
+                "~/.config/fish/config.fish",
+                "source ~/.config/shtick/load_active.fish",
+            ),
+            "ksh": ("~/.kshrc", "source ~/.config/shtick/load_active.ksh"),
+            "mksh": ("~/.mkshrc", "source ~/.config/shtick/load_active.mksh"),
+            "yash": ("~/.yashrc", "source ~/.config/shtick/load_active.yash"),
+            "dash": ("~/.dashrc", "source ~/.config/shtick/load_active.dash"),
+            "csh": ("~/.cshrc", "source ~/.config/shtick/load_active.csh"),
+            "tcsh": ("~/.tcshrc", "source ~/.config/shtick/load_active.tcsh"),
+            "xonsh": ("~/.xonshrc", "source ~/.config/shtick/load_active.xonsh"),
+            "elvish": (
+                "~/.elvish/rc.elv",
+                "source ~/.config/shtick/load_active.elvish",
+            ),
+            "nushell": (
+                "~/.config/nushell/config.nu",
+                "source ~/.config/shtick/load_active.nushell",
+            ),
+            "powershell": ("$PROFILE", ". ~/.config/shtick/load_active.powershell"),
+            "rc": ("~/.rcrc", "source ~/.config/shtick/load_active.rc"),
+            "es": ("~/.esrc", "source ~/.config/shtick/load_active.es"),
+            "oil": ("~/.oilrc", "source ~/.config/shtick/load_active.oil"),
+        }
+
+        # Display numbered list
+        for i, shell in enumerate(shells, 1):
+            config_file = shell_configs.get(
+                shell, ("~/.profile", f"source ~/.config/shtick/load_active.{shell}")
+            )[0]
+            print(f"  {i:2d}. {shell:<12} ({config_file})")
+
+        print(f"  {len(shells)+1:2d}. all          (show all shells)")
+        print()
+
+        try:
+            user_input = input(
+                "Enter shell numbers or names (space-separated): "
+            ).strip()
+            if not user_input:
+                print("No selection made, showing default instructions.")
+                self._print_default_instructions()
+                return
+
+            selected_shells = self._parse_shell_selection(user_input, shells)
+
+            if not selected_shells:
+                print("No valid shells selected, showing default instructions.")
+                self._print_default_instructions()
+                return
+
+            print("\nAdd these lines to your shell configuration files:")
+            print("=" * 60)
+
+            for shell in selected_shells:
+                config_file, source_line = shell_configs.get(
+                    shell,
+                    ("~/.profile", f"source ~/.config/shtick/load_active.{shell}"),
+                )
+
+                print(f"\n# {shell.upper()}")
+                print(f"# File: {config_file}")
+                print(f"{source_line}")
+
+            print("\n" + "=" * 60)
+
+        except (KeyboardInterrupt, EOFError):
+            print("\nCancelled. Showing default instructions.")
+            self._print_default_instructions()
+
+    def _parse_shell_selection(
+        self, user_input: str, available_shells: List[str]
+    ) -> List[str]:
+        """Parse user input for shell selection (numbers or names)"""
+        selected = set()
+        tokens = user_input.lower().split()
+
+        for token in tokens:
+            # Check if it's "all"
+            if token == "all":
+                return available_shells
+
+            # Check if it's a number
+            try:
+                num = int(token)
+                if 1 <= num <= len(available_shells):
+                    selected.add(available_shells[num - 1])
+                elif num == len(available_shells) + 1:  # "all" option
+                    return available_shells
+                else:
+                    print(f"Warning: Invalid number {num}, ignoring")
+                continue
+            except ValueError:
+                pass
+
+            # Check if it's a shell name (fuzzy match)
+            matches = [shell for shell in available_shells if token in shell.lower()]
+            if len(matches) == 1:
+                selected.add(matches[0])
+            elif len(matches) > 1:
+                print(
+                    f"Warning: '{token}' matches multiple shells: {', '.join(matches)}"
+                )
+                print(f"Using exact match or first match: {matches[0]}")
+                selected.add(matches[0])
+            else:
+                print(f"Warning: No shell matches '{token}', ignoring")
+
+        return sorted(list(selected))
 
     def get_shell_files_for_group(self, group_name: str) -> Dict[str, List[str]]:
         """Get list of generated shell files for a group"""

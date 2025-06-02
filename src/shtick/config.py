@@ -22,8 +22,9 @@ class GroupData:
 class Config:
     """Main configuration handler"""
 
-    def __init__(self, config_path: Optional[str] = None):
+    def __init__(self, config_path: Optional[str] = None, debug: bool = False):
         self.config_path = config_path or self.get_default_config_path()
+        self.debug = debug
         self.groups: List[GroupData] = []
 
     @staticmethod
@@ -103,22 +104,28 @@ class Config:
         if not os.path.exists(self.config_path):
             raise FileNotFoundError(f"Config file not found: {self.config_path}")
 
-        print(f"Debug: Loading config from: {self.config_path}")
+        if self.debug:
+            print(f"Debug: Loading config from: {self.config_path}")
 
         with open(self.config_path, "rb") as f:
             data = tomllib.load(f)
 
-        print(f"Debug: Raw TOML data keys: {list(data.keys())}")
-        print(f"Debug: Raw TOML data structure: {data}")
+        if self.debug:
+            print(f"Debug: Raw TOML data keys: {list(data.keys())}")
+            print(f"Debug: Raw TOML data structure: {data}")
 
         self.groups = []
 
         # Parse groups from nested TOML structure
         for group_name, group_config in data.items():
-            print(f"Debug: Processing group '{group_name}' with config: {group_config}")
+            if self.debug:
+                print(
+                    f"Debug: Processing group '{group_name}' with config: {group_config}"
+                )
 
             if not isinstance(group_config, dict):
-                print(f"Debug: Skipping non-dict value for key '{group_name}'")
+                if self.debug:
+                    print(f"Debug: Skipping non-dict value for key '{group_name}'")
                 continue
 
             # Initialize group data
@@ -126,27 +133,34 @@ class Config:
 
             # Extract each section from the group
             for section_name, section_data in group_config.items():
-                print(
-                    f"Debug: Processing section '{section_name}' in group '{group_name}': {section_data}"
-                )
+                if self.debug:
+                    print(
+                        f"Debug: Processing section '{section_name}' in group '{group_name}': {section_data}"
+                    )
 
                 if section_name == "aliases" and isinstance(section_data, dict):
                     group_data["aliases"] = section_data
-                    print(f"Debug: Added {len(section_data)} aliases to '{group_name}'")
+                    if self.debug:
+                        print(
+                            f"Debug: Added {len(section_data)} aliases to '{group_name}'"
+                        )
                 elif section_name == "env_vars" and isinstance(section_data, dict):
                     group_data["env_vars"] = section_data
-                    print(
-                        f"Debug: Added {len(section_data)} env_vars to '{group_name}'"
-                    )
+                    if self.debug:
+                        print(
+                            f"Debug: Added {len(section_data)} env_vars to '{group_name}'"
+                        )
                 elif section_name == "functions" and isinstance(section_data, dict):
                     group_data["functions"] = section_data
-                    print(
-                        f"Debug: Added {len(section_data)} functions to '{group_name}'"
-                    )
+                    if self.debug:
+                        print(
+                            f"Debug: Added {len(section_data)} functions to '{group_name}'"
+                        )
                 else:
-                    print(
-                        f"Debug: Unknown or invalid section '{section_name}' in group '{group_name}'"
-                    )
+                    if self.debug:
+                        print(
+                            f"Debug: Unknown or invalid section '{section_name}' in group '{group_name}'"
+                        )
 
             # Create GroupData object if group has any items
             total_items = (
@@ -154,7 +168,8 @@ class Config:
                 + len(group_data["env_vars"])
                 + len(group_data["functions"])
             )
-            print(f"Debug: Group '{group_name}' has {total_items} total items")
+            if self.debug:
+                print(f"Debug: Group '{group_name}' has {total_items} total items")
 
             if total_items > 0:
                 new_group = GroupData(
@@ -164,15 +179,18 @@ class Config:
                     functions=group_data["functions"],
                 )
                 self.groups.append(new_group)
-                print(
-                    f"Debug: Created group '{group_name}' with {len(group_data['aliases'])} aliases, {len(group_data['env_vars'])} env_vars, {len(group_data['functions'])} functions"
-                )
+                if self.debug:
+                    print(
+                        f"Debug: Created group '{group_name}' with {len(group_data['aliases'])} aliases, {len(group_data['env_vars'])} env_vars, {len(group_data['functions'])} functions"
+                    )
             else:
-                print(f"Warning: Group '{group_name}' has no items, skipping")
+                if self.debug:
+                    print(f"Warning: Group '{group_name}' has no items, skipping")
 
-        print(
-            f"Debug: Final groups loaded: {[g.name for g in self.groups]} (total: {len(self.groups)})"
-        )
+        if self.debug:
+            print(
+                f"Debug: Final groups loaded: {[g.name for g in self.groups]} (total: {len(self.groups)})"
+            )
 
     def save(self) -> None:
         """Save the current configuration back to TOML file"""
