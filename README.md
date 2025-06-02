@@ -12,10 +12,44 @@ It's useful if you use multiple shells regularly and would like a single source 
 - Manage persistent aliases, env vars, shell functions
 - Define toggleable groups of aliases, e.g. `dev`, `personal`
 
-If you decide you want to use this yourself, do all the usual cloning, then from your local run `make install`. 
+### Shell Integration
+Shtick generates shell-specific files in `~/.config/shtick/`. To make them available in new shell sessions, add this to your shell config:  
 
+```
+# ~/.bashrc or ~/.zshrc
+source ~/.config/shtick/load_active.bash
 
-`usage: shtick [-h] [--debug] {generate,add,add-persistent,alias,env,function,remove,remove-persistent,activate,deactivate,status,list,shells,source} ...`
+# ~/.config/fish/config.fish or whatever shell you use
+source ~/.config/shtick/load_active.fish
+```
+
+### Supported Shells
+`bash`, `zsh`, `fish`, `ksh`, `mksh`, `yash`, `dash`, `csh`, `tcsh`, `xonsh`, `elvish`, `nushell`, `powershell`, `rc`, `es`, `oil`
+- Run `shtick shells` to see the complete list.
+
+If you decide you want to use this yourself, do all the usual cloning, then from your local run `make install` and the `shtick` package will be installed in your environment.  
+
+### Commands reference
+```
+shtick alias <key>=<value>           # Add persistent alias
+shtick env <key>=<value>             # Add persistent env var
+shtick function <key>=<value>        # Add persistent function
+
+shtick add <type> <group> <key>=<value>    # Add to specific group
+shtick remove <type> <group> <key>         # Remove from group
+
+shtick activate <group>              # Activate group
+shtick deactivate <group>           # Deactivate group
+
+shtick status                       # Show status
+shtick list [-l]                    # List items
+shtick generate                     # Regenerate shell files
+shtick source [--shell <shell>]     # Output source command
+
+shtick shells [-l]                  # List supported shells
+```
+
+``
 
 Usage examples:
 ```
@@ -98,6 +132,7 @@ TOM = "JERRY"
 [personal.functions]
 note = "echo \"$(date): $*\" >> $HOME/notes.txt"
 ```  
+
 
 ## Python API Usage
 We also expose a public API for using shtick functionality as library functions.  
