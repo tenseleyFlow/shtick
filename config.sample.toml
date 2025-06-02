@@ -6,6 +6,7 @@ c = "clear"
 gad="git add"
 pls="sudo !!"
 bk = "- || cd -"
+wttr = "curl wttr.in"
 refresh = "source ${HOME}/.zshrc"
 goclass = "cd ${HOME}/Documents/Class/"
 goproj = "cd ${HOME}/Documents/Project/"
@@ -21,9 +22,6 @@ gpull="git pull origin trunk"
 gputt="git push origin trunk"
 gcamm="git commit --all --message"
 glogg="git log --online --graph --decorate --all"
-
-wttr = "curl wttr.in"
-
 
 [persistent.env_vars] 
 PAGER = "less"
@@ -54,13 +52,11 @@ serve = "python manage.py runserver"
 pyserve = "python3 -m http.server 8000"
 brewup = "brew update && brew upgrade && brew cleanup"
 
-
 [dev.env_vars]
 JOM = "terry"
 
 [dev.functions]
 newproject = "mkdir -p \"$HOME/projects/$1\" && cd \"$HOME/projects/$1\" && git init"
-
 
 
 [personal.aliases]
