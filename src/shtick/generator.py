@@ -83,15 +83,84 @@ class Generator:
         for group in config.groups:
             self.generate_for_group(group)
 
+        # Generate the dynamic loader for all shells
+        self.generate_loader(config)
+
         print(f"All done! Files generated in {self.output_base_dir}")
-        print("\nTo use these files, add lines like this to your shell config:")
-        print("  # For bash/zsh:")
-        print("  source ~/.config/shtick/GROUP_NAME/alias/aliases.bash")
-        print("  source ~/.config/shtick/GROUP_NAME/env/envvars.bash")
-        print("  source ~/.config/shtick/GROUP_NAME/function/functions.bash")
-        print("\n  # For fish:")
-        print("  source ~/.config/shtick/GROUP_NAME/alias/aliases.fish")
-        print("  # etc...")
+        self._print_usage_instructions(config)
+
+    def generate_loader(self, config: Config) -> None:
+        """Generate dynamic loader files that source persistent + active groups"""
+        print("Generating dynamic loader files...")
+
+        active_groups = config.load_active_groups()
+        persistent_group = config.get_persistent_group()
+
+        # Generate for each supported shell + default
+        all_shells = get_supported_shells() + ["default"]
+
+        for shell_name in all_shells:
+            loader_path = os.path.join(
+                self.output_base_dir, f"load_active.{shell_name}"
+            )
+
+            with open(loader_path, "w") as f:
+                f.write(f"# Shtick dynamic loader for {shell_name}\n")
+                f.write("# This file is auto-generated - do not edit\n\n")
+
+                # Source persistent group first (always active)
+                if persistent_group:
+                    f.write("# Load persistent configuration\n")
+                    for item_type in ["alias", "env", "function"]:
+                        file_path = f"$HOME/.config/shtick/persistent/{item_type}"
+                        f.write(f'[ -f "{file_path}/{item_type}s.{shell_name}" ] && ')
+                        f.write(f'source "{file_path}/{item_type}s.{shell_name}"\n')
+                    f.write("\n")
+
+                # Source active groups
+                if active_groups:
+                    f.write("# Load active groups\n")
+                    for group_name in active_groups:
+                        f.write(f"# Group: {group_name}\n")
+                        for item_type in ["alias", "env", "function"]:
+                            file_path = f"$HOME/.config/shtick/{group_name}/{item_type}"
+                            f.write(
+                                f'[ -f "{file_path}/{item_type}s.{shell_name}" ] && '
+                            )
+                            f.write(f'source "{file_path}/{item_type}s.{shell_name}"\n')
+                        f.write("\n")
+                else:
+                    f.write("# No active groups\n")
+
+    def _print_usage_instructions(self, config: Config) -> None:
+        """Print usage instructions for the user"""
+        active_groups = config.load_active_groups()
+        persistent_group = config.get_persistent_group()
+
+        print("\nTo use these configurations, add this line to your shell config:")
+        print("  # For bash/zsh (~/.bashrc or ~/.zshrc):")
+        print("  source ~/.config/shtick/load_active.bash")
+        print("\n  # For fish (~/.config/fish/config.fish):")
+        print("  source ~/.config/shtick/load_active.fish")
+
+        if persistent_group:
+            total_persistent = (
+                len(persistent_group.aliases)
+                + len(persistent_group.env_vars)
+                + len(persistent_group.functions)
+            )
+            print(f"\nPersistent items (always active): {total_persistent} total")
+
+        if active_groups:
+            print(f"Active groups: {', '.join(active_groups)}")
+        else:
+            print(
+                "No groups currently active. Use 'shtick activate <group>' to activate groups."
+            )
+
+        available_groups = [g.name for g in config.get_regular_groups()]
+        if available_groups:
+            print(f"Available groups: {', '.join(available_groups)}")
 
     def get_shell_files_for_group(self, group_name: str) -> Dict[str, List[str]]:
         """Get list of generated shell files for a group"""
