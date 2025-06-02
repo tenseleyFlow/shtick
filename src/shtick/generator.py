@@ -72,7 +72,7 @@ class Generator:
 
                     f.write(line)
 
-    def generate_all(self, config: Config, interactive: bool = False) -> None:
+    def generate_all(self, config: Config, interactive: bool = True) -> None:
         """Generate shell files for all groups in config"""
         if not config.groups:
             print("No groups found in configuration")
@@ -143,7 +143,7 @@ class Generator:
                     f.write("# No active groups\n")
 
     def _print_usage_instructions(
-        self, config: Config, interactive: bool = False
+        self, config: Config, interactive: bool = True
     ) -> None:
         """Print usage instructions for the user"""
         active_groups = config.load_active_groups()
@@ -233,15 +233,13 @@ class Generator:
                 "Enter shell numbers or names (space-separated): "
             ).strip()
             if not user_input:
-                print("No selection made, showing default instructions.")
-                self._print_default_instructions()
+                print("No selection made, skipping sourcing instructions.")
                 return
 
             selected_shells = self._parse_shell_selection(user_input, shells)
 
             if not selected_shells:
-                print("No valid shells selected, showing default instructions.")
-                self._print_default_instructions()
+                print("No valid shells selected, skipping sourcing instructions.")
                 return
 
             print("\nAdd these lines to your shell configuration files:")
@@ -260,8 +258,7 @@ class Generator:
             print("\n" + "=" * 60)
 
         except (KeyboardInterrupt, EOFError):
-            print("\nCancelled. Showing default instructions.")
-            self._print_default_instructions()
+            print("\nCancelled. Skipping sourcing instructions.")
 
     def _parse_shell_selection(
         self, user_input: str, available_shells: List[str]
