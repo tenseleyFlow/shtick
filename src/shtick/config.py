@@ -61,8 +61,11 @@ class GroupData:
 class Config:
     """Main configuration handler"""
 
-    # Class variable for shell detection caching
+    # Class variables for caching
     _detected_shell = None
+    _active_groups_cache = None
+    _active_groups_mtime = None
+    _active_groups_file_path = None
 
     def __init__(self, config_path: Optional[str] = None):
         self.config_path = config_path or self.get_default_config_path()
@@ -96,14 +99,44 @@ class Config:
         """Clear the cached shell detection (useful for testing)"""
         cls._detected_shell = None
 
-    def load_active_groups(self) -> List[str]:
-        """Load list of currently active groups"""
-        active_file = self.get_active_groups_file()
-        if not os.path.exists(active_file):
-            return []
+    @classmethod
+    def clear_all_caches(cls):
+        """Clear all caches (useful for testing or forced refresh)"""
+        cls._detected_shell = None
+        cls._active_groups_cache = None
+        cls._active_groups_mtime = None
+        cls._active_groups_file_path = None
 
-        with open(active_file, "r") as f:
-            return [line.strip() for line in f if line.strip()]
+    def load_active_groups(self) -> List[str]:
+        """Load list of currently active groups with caching"""
+        active_file = self.get_active_groups_file()
+
+        # Check if we need to reload from disk
+        if os.path.exists(active_file):
+            current_mtime = os.path.getmtime(active_file)
+            if (
+                self._active_groups_cache is None
+                or self._active_groups_file_path != active_file
+                or self._active_groups_mtime != current_mtime
+            ):
+
+                logger.debug(f"Reloading active groups from {active_file}")
+                with open(active_file, "r") as f:
+                    self._active_groups_cache = [
+                        line.strip() for line in f if line.strip()
+                    ]
+                self._active_groups_mtime = current_mtime
+                self._active_groups_file_path = active_file
+            else:
+                logger.debug("Using cached active groups")
+        else:
+            # File doesn't exist, return empty list
+            self._active_groups_cache = []
+            self._active_groups_mtime = None
+
+        return (
+            self._active_groups_cache.copy()
+        )  # Return a copy to prevent external modification
 
     def save_active_groups(self, active_groups: List[str]) -> None:
         """Save list of active groups to state file"""
@@ -113,6 +146,11 @@ class Config:
         with open(active_file, "w") as f:
             for group in active_groups:
                 f.write(f"{group}\n")
+
+        # Invalidate cache by updating mtime
+        self._active_groups_cache = active_groups.copy()
+        self._active_groups_mtime = os.path.getmtime(active_file)
+        self._active_groups_file_path = active_file
 
     def activate_group(self, group_name: str) -> bool:
         """Activate a group. Returns True if successful."""
@@ -284,10 +322,19 @@ class Config:
 
     def get_all_shells_to_generate(self) -> List[str]:
         """Get list of shells to generate files for based on user settings"""
-        # For now, just detect current shell and common ones
-        # Later this can read from settings.toml
+        from .settings import Settings
+
+        settings = Settings()
+
+        # If shells are explicitly set in settings, use those
+        if settings.generation.shells:
+            logger.debug(f"Using shells from settings: {settings.generation.shells}")
+            return settings.generation.shells
+
+        # Otherwise auto-detect based on current shell
         current_shell = self.get_current_shell()
         if not current_shell:
+            logger.debug("No current shell detected, using defaults")
             return ["bash", "zsh", "fish"]  # Common defaults
 
         # Include current shell and close relatives
@@ -300,4 +347,7 @@ class Config:
         }
 
         shells = shell_families.get(current_shell, [current_shell])
+        logger.debug(
+            f"Auto-detected shells based on current shell '{current_shell}': {shells}"
+        )
         return list(set(shells))  # Remove duplicates

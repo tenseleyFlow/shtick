@@ -19,15 +19,29 @@ class Generator:
         self.output_base_dir = output_base_dir or Config.get_output_dir()
         # Get shells to generate for once
         self._shells_to_generate = None
+        self._config_for_shells = None
 
     @property
     def shells_to_generate(self) -> List[str]:
         """Get list of shells to generate files for"""
         if self._shells_to_generate is None:
-            config = Config()
-            self._shells_to_generate = config.get_all_shells_to_generate()
+            # If we have a config instance stored, use it
+            if self._config_for_shells:
+                self._shells_to_generate = (
+                    self._config_for_shells.get_all_shells_to_generate()
+                )
+            else:
+                # Otherwise create a temporary one just for getting shells
+                config = Config()
+                self._shells_to_generate = config.get_all_shells_to_generate()
             logger.debug(f"Will generate files for shells: {self._shells_to_generate}")
         return self._shells_to_generate
+
+    def set_config_for_shells(self, config: Config) -> None:
+        """Set config instance to use for shell detection"""
+        self._config_for_shells = config
+        # Clear cached shells to force re-read
+        self._shells_to_generate = None
 
     def ensure_output_dir(self, group_name: str) -> str:
         """Ensure output directory exists and return the path"""
@@ -118,6 +132,9 @@ class Generator:
             print("No groups found in configuration")
             return
 
+        # Set config for shell detection FIRST
+        self.set_config_for_shells(config)
+
         print(f"Generating shell files for {len(config.groups)} groups...")
         print(f"Target shells: {', '.join(self.shells_to_generate)}")
 
@@ -135,6 +152,9 @@ class Generator:
     def generate_loader(self, config: Config) -> None:
         """Generate dynamic loader files that source persistent + active groups"""
         logger.info("Generating dynamic loader files...")
+
+        # Set config for shell detection
+        self.set_config_for_shells(config)
 
         active_groups = config.load_active_groups()
         persistent_group = config.get_persistent_group()

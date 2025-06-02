@@ -54,6 +54,13 @@ class ShtickCommands:
 
     def offer_auto_source(self):
         """Offer to source shtick in current shell session"""
+        # Check settings first
+        from shtick.settings import Settings
+
+        settings = Settings()
+        if not settings.behavior.auto_source_prompt:
+            return
+
         current_shell = self.get_current_shell()
         if not current_shell or current_shell not in ["bash", "zsh", "fish"]:
             return
@@ -403,3 +410,134 @@ class ShtickCommands:
 
         # Output the source command that can be eval'd
         print(f"source {loader_path}")
+
+    # Settings commands
+    def settings_init(self):
+        """Initialize settings file with defaults"""
+        from shtick.settings import Settings
+
+        settings = Settings()
+
+        if os.path.exists(settings._settings_path):
+            try:
+                response = (
+                    input("Settings file already exists. Overwrite? [y/N]: ")
+                    .strip()
+                    .lower()
+                )
+                if response not in ["y", "yes"]:
+                    print("Cancelled")
+                    return
+            except (KeyboardInterrupt, EOFError):
+                print("\nCancelled")
+                return
+
+        settings.create_default_settings_file()
+        print(f"✓ Created settings file at {settings._settings_path}")
+        print("\nYou can now customize your shtick behavior by editing this file.")
+
+    def settings_show(self):
+        """Show current settings"""
+        from shtick.settings import Settings
+
+        settings = Settings()
+
+        print("Shtick Settings")
+        print("=" * 50)
+
+        print("\n[generation]")
+        print(f"  shells = {settings.generation.shells or '[] (auto-detect)'}")
+        print(f"  parallel = {settings.generation.parallel}")
+        print(f"  consolidate_files = {settings.generation.consolidate_files}")
+
+        print("\n[behavior]")
+        print(f"  auto_source_prompt = {settings.behavior.auto_source_prompt}")
+        print(f"  check_conflicts = {settings.behavior.check_conflicts}")
+        print(f"  backup_on_save = {settings.behavior.backup_on_save}")
+        print(f"  interactive_mode = {settings.behavior.interactive_mode}")
+
+        print("\n[performance]")
+        print(f"  cache_ttl = {settings.performance.cache_ttl}")
+        print(f"  lazy_load = {settings.performance.lazy_load}")
+        print(f"  batch_operations = {settings.performance.batch_operations}")
+
+        print(f"\nSettings file: {settings._settings_path}")
+        if not os.path.exists(settings._settings_path):
+            print("(No settings file found - using defaults)")
+            print("Run 'shtick settings init' to create one")
+
+    def settings_set(self, key: str, value: str):
+        """Set a specific setting value"""
+        from shtick.settings import Settings
+
+        settings = Settings()
+
+        # Parse the key (e.g., "generation.shells")
+        parts = key.split(".")
+        if len(parts) != 2:
+            print(
+                f"Error: Invalid key format. Use 'section.key' (e.g., 'generation.shells')"
+            )
+            sys.exit(1)
+
+        section, setting_key = parts
+
+        # Validate section
+        if section not in ["generation", "behavior", "performance"]:
+            print(
+                f"Error: Invalid section '{section}'. Must be one of: generation, behavior, performance"
+            )
+            sys.exit(1)
+
+        # Get the section object
+        section_obj = getattr(settings, section)
+
+        # Check if key exists
+        if not hasattr(section_obj, setting_key):
+            print(f"Error: Invalid key '{setting_key}' for section '{section}'")
+            print(f"Valid keys: {', '.join(vars(section_obj).keys())}")
+            sys.exit(1)
+
+        # Parse the value based on type
+        current_value = getattr(section_obj, setting_key)
+        try:
+            if isinstance(current_value, bool):
+                # Parse boolean
+                if value.lower() in ["true", "1", "yes", "on"]:
+                    parsed_value = True
+                elif value.lower() in ["false", "0", "no", "off"]:
+                    parsed_value = False
+                else:
+                    raise ValueError(f"Invalid boolean value: {value}")
+            elif isinstance(current_value, int):
+                # Parse integer
+                parsed_value = int(value)
+            elif isinstance(current_value, list):
+                # Parse list (simple eval for now - could be improved)
+                if value == "[]":
+                    parsed_value = []
+                elif value.startswith("[") and value.endswith("]"):
+                    # Simple parsing - just split by comma
+                    parsed_value = [
+                        s.strip().strip("\"'")
+                        for s in value[1:-1].split(",")
+                        if s.strip()
+                    ]
+                else:
+                    # Single value becomes a list
+                    parsed_value = [value]
+            else:
+                # String value
+                parsed_value = value
+        except Exception as e:
+            print(f"Error parsing value: {e}")
+            sys.exit(1)
+
+        # Set the value
+        setattr(section_obj, setting_key, parsed_value)
+
+        # Save settings
+        settings.save()
+
+        print(f"✓ Set {key} = {parsed_value}")
+        print(f"Settings saved to {settings._settings_path}")

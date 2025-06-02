@@ -40,14 +40,12 @@ class ShtickManager:
             debug: Enable debug output
         """
         self.config_path = config_path or Config.get_default_config_path()
+        self.debug = debug
 
-        # Set up logging
-        if debug:
-            logging.basicConfig(
-                level=logging.DEBUG, format="%(name)s - %(levelname)s - %(message)s"
-            )
-        else:
-            logging.basicConfig(level=logging.INFO, format="%(message)s")
+        # Set up logging using centralized setup
+        from .logger import setup_logging
+
+        self.logger = setup_logging(debug=debug)
 
         self._config = None
         self._generator = Generator()
@@ -269,6 +267,13 @@ class ShtickManager:
         try:
             config = self._get_config()
 
+            # Use settings if check_conflicts not explicitly set
+            if check_conflicts is None:
+                from .settings import Settings
+
+                settings = Settings()
+                check_conflicts = settings.behavior.check_conflicts
+
             # Check for conflicts if requested
             if check_conflicts:
                 conflicts = self.check_conflicts(item_type, key, group_name)
@@ -311,6 +316,107 @@ class ShtickManager:
         except Exception as e:
             logger.error(f"Error removing {item_type}: {e}")
             return False
+
+    # Batch operations
+    def add_items_batch(
+        self, items: List[Dict[str, Union[str, bool]]]
+    ) -> Dict[str, List[str]]:
+        """
+        Add multiple items in one batch operation.
+
+        Args:
+            items: List of dicts with keys: type, group, key, value, check_conflicts (optional)
+                Example: [
+                    {'type': 'alias', 'group': 'dev', 'key': 'll', 'value': 'ls -la'},
+                    {'type': 'env', 'group': 'dev', 'key': 'DEBUG', 'value': '1'},
+                ]
+
+        Returns:
+            Dictionary with 'success' and 'failed' lists of item keys
+        """
+        results = {"success": [], "failed": []}
+        config = self._get_config()
+        affected_groups = set()
+
+        for item in items:
+            try:
+                item_type = item["type"]
+                group_name = item["group"]
+                key = item["key"]
+                value = item["value"]
+                check_conflicts = item.get("check_conflicts", True)
+
+                # Check for conflicts if requested
+                if check_conflicts:
+                    conflicts = self.check_conflicts(item_type, key, group_name)
+                    if conflicts:
+                        logger.warning(
+                            f"Item '{key}' exists in groups: {[c[0] for c in conflicts]}"
+                        )
+
+                # Add the item
+                config.add_item(item_type, group_name, key, value)
+                results["success"].append(key)
+
+                # Track affected groups
+                if group_name == "persistent" or config.is_group_active(group_name):
+                    affected_groups.add(group_name)
+
+            except Exception as e:
+                logger.error(f"Failed to add item '{item.get('key', 'unknown')}': {e}")
+                results["failed"].append(item.get("key", "unknown"))
+
+        # Save and regenerate once for all affected groups
+        if results["success"]:
+            self._save_and_regenerate(list(affected_groups))
+
+        return results
+
+    def remove_items_batch(self, items: List[Dict[str, str]]) -> Dict[str, List[str]]:
+        """
+        Remove multiple items in one batch operation.
+
+        Args:
+            items: List of dicts with keys: type, group, key
+                Example: [
+                    {'type': 'alias', 'group': 'dev', 'key': 'll'},
+                    {'type': 'env', 'group': 'dev', 'key': 'DEBUG'},
+                ]
+
+        Returns:
+            Dictionary with 'success' and 'failed' lists of item keys
+        """
+        results = {"success": [], "failed": []}
+        config = self._get_config()
+        affected_groups = set()
+
+        for item in items:
+            try:
+                item_type = item["type"]
+                group_name = item["group"]
+                key = item["key"]
+
+                # Remove the item
+                if config.remove_item(item_type, group_name, key):
+                    results["success"].append(key)
+
+                    # Track affected groups
+                    if group_name == "persistent" or config.is_group_active(group_name):
+                        affected_groups.add(group_name)
+                else:
+                    results["failed"].append(key)
+
+            except Exception as e:
+                logger.error(
+                    f"Failed to remove item '{item.get('key', 'unknown')}': {e}"
+                )
+                results["failed"].append(item.get("key", "unknown"))
+
+        # Save and regenerate once for all affected groups
+        if results["success"]:
+            self._save_and_regenerate(list(affected_groups))
+
+        return results
 
     # Group management
     def activate_group(self, group: str) -> bool:
