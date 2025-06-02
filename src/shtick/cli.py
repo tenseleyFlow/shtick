@@ -124,6 +124,29 @@ def main():
         "--shell", help="Specify shell type (auto-detected if not provided)"
     )
 
+    # Settings command
+    settings_parser = subparsers.add_parser("settings", help="Manage shtick settings")
+    settings_subparsers = settings_parser.add_subparsers(
+        dest="settings_command", help="Settings commands"
+    )
+
+    # Settings subcommands
+    settings_init_parser = settings_subparsers.add_parser(
+        "init", help="Create default settings file"
+    )
+
+    settings_show_parser = settings_subparsers.add_parser(
+        "show", help="Show current settings"
+    )
+
+    settings_set_parser = settings_subparsers.add_parser(
+        "set", help="Set a setting value"
+    )
+    settings_set_parser.add_argument(
+        "key", help="Setting key (e.g., generation.shells)"
+    )
+    settings_set_parser.add_argument("value", help="Setting value")
+
     args = parser.parse_args()
 
     # Set up logging first
@@ -172,6 +195,15 @@ def main():
             display.shells(args.long)
         elif args.command == "source":
             commands.source_command(args.shell)
+        elif args.command == "settings":
+            if args.settings_command == "init":
+                commands.settings_init()
+            elif args.settings_command == "show":
+                commands.settings_show()
+            elif args.settings_command == "set":
+                commands.settings_set(args.key, args.value)
+            else:
+                settings_parser.print_help()
 
     except KeyboardInterrupt:
         logger.debug("Operation cancelled by user")

@@ -1,0 +1,25 @@
+[generation]
+# Shells to generate files for. Empty list = auto-detect based on current shell
+shells = ["bash", "dash", "zsh", "nushell", "powershell", "yash", "fish", "oil", "elvish"]
+# Enable parallel generation (not implemented yet)
+parallel = false
+# Consolidate all items into single files per shell
+consolidate_files = true
+
+[behavior]
+# Prompt to source changes after modifications
+auto_source_prompt = true
+# Check for conflicts when adding items
+check_conflicts = true
+# Create backups before saving config
+backup_on_save = false
+# Enable interactive prompts
+interactive_mode = true
+
+[performance]
+# Cache time-to-live in seconds
+cache_ttl = 300
+# Enable lazy loading (not implemented yet)
+lazy_load = false
+# Enable batch operations for better performance
+batch_operations = true
