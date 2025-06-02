@@ -69,6 +69,54 @@ def cmd_add(args) -> None:
         sys.exit(1)
 
 
+def cmd_add_persistent(args) -> None:
+    """Add an item to the persistent group"""
+    if "=" not in args.assignment:
+        print("Error: Assignment must be in format key=value")
+        sys.exit(1)
+
+    key, value = args.assignment.split("=", 1)
+    key = key.strip()
+    value = value.strip()
+
+    if not key or not value:
+        print("Error: Both key and value must be non-empty")
+        sys.exit(1)
+
+    config_path = Config.get_default_config_path()
+
+    try:
+        config = Config(config_path, debug=getattr(args, "debug", False))
+        # Try to load existing config, create empty if doesn't exist
+        try:
+            config.load()
+        except FileNotFoundError:
+            print(f"Creating new config file at {config_path}")
+
+        config.add_item(args.type, "persistent", key, value)
+        config.save()
+
+        print(
+            f"Added {args.type} '{key}' = '{value}' to persistent group (always active)"
+        )
+
+        # Auto-regenerate files if they exist
+        try:
+            generator = Generator()
+            persistent_group = config.get_persistent_group()
+            if persistent_group:
+                generator.generate_for_group(persistent_group)
+                generator.generate_loader(config)
+                print("Regenerated shell files with new persistent item")
+        except Exception as e:
+            print(f"Warning: Failed to regenerate files: {e}")
+            print("Run 'shtick generate' to update shell files")
+
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)
+
+
 def cmd_remove(args) -> None:
     """Remove an item from the config"""
     config_path = Config.get_default_config_path()
@@ -112,6 +160,88 @@ def cmd_remove(args) -> None:
                     if config.remove_item(args.type, args.group, item):
                         config.save()
                         print(f"Removed {args.type} '{item}' from group '{args.group}'")
+                    else:
+                        print(f"Failed to remove {args.type} '{item}'")
+                else:
+                    print("Invalid choice")
+            except (ValueError, KeyboardInterrupt):
+                print("\nCancelled")
+
+    except FileNotFoundError:
+        print(f"Config file not found: {config_path}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)
+
+
+def cmd_remove_persistent(args) -> None:
+    """Remove an item from the persistent group"""
+    config_path = Config.get_default_config_path()
+
+    try:
+        config = Config(config_path, debug=getattr(args, "debug", False))
+        config.load()
+
+        # Find matching items in persistent group
+        matches = config.find_items(args.type, "persistent", args.search)
+
+        if not matches:
+            print(
+                f"No {args.type} items matching '{args.search}' found in persistent group"
+            )
+            return
+
+        if len(matches) == 1:
+            # Exact match, remove it
+            item = matches[0]
+            if config.remove_item(args.type, "persistent", item):
+                config.save()
+                print(f"Removed {args.type} '{item}' from persistent group")
+
+                # Auto-regenerate files
+                try:
+                    generator = Generator()
+                    persistent_group = config.get_persistent_group()
+                    if persistent_group:
+                        generator.generate_for_group(persistent_group)
+                    generator.generate_loader(config)
+                    print("Regenerated shell files")
+                except Exception as e:
+                    print(f"Warning: Failed to regenerate files: {e}")
+                    print("Run 'shtick generate' to update shell files")
+            else:
+                print(f"Failed to remove {args.type} '{item}'")
+        else:
+            # Multiple matches, ask for confirmation
+            print(f"Found {len(matches)} matches in persistent group:")
+            for i, item in enumerate(matches, 1):
+                print(f"  {i}. {item}")
+
+            try:
+                choice = input("Enter number to remove (or 'q' to quit): ").strip()
+                if choice.lower() == "q":
+                    print("Cancelled")
+                    return
+
+                idx = int(choice) - 1
+                if 0 <= idx < len(matches):
+                    item = matches[idx]
+                    if config.remove_item(args.type, "persistent", item):
+                        config.save()
+                        print(f"Removed {args.type} '{item}' from persistent group")
+
+                        # Auto-regenerate files
+                        try:
+                            generator = Generator()
+                            persistent_group = config.get_persistent_group()
+                            if persistent_group:
+                                generator.generate_for_group(persistent_group)
+                            generator.generate_loader(config)
+                            print("Regenerated shell files")
+                        except Exception as e:
+                            print(f"Warning: Failed to regenerate files: {e}")
+                            print("Run 'shtick generate' to update shell files")
                     else:
                         print(f"Failed to remove {args.type} '{item}'")
                 else:
@@ -455,6 +585,7 @@ def cmd_status(args) -> None:
         print()
         print("To activate a group: shtick activate <group>")
         print("To deactivate a group: shtick deactivate <group>")
+        print("To add persistent items: shtick add-persistent <type> <key>=<value>")
 
     except FileNotFoundError:
         print(f"Config file not found: {config_path}")
@@ -494,6 +625,17 @@ def main():
     add_parser.add_argument("group", help="Group name")
     add_parser.add_argument("assignment", help="Assignment in format key=value")
 
+    # Add-persistent command
+    add_persistent_parser = subparsers.add_parser(
+        "add-persistent", help="Add an item to the persistent group (always active)"
+    )
+    add_persistent_parser.add_argument(
+        "type", choices=["alias", "env", "function"], help="Type of item to add"
+    )
+    add_persistent_parser.add_argument(
+        "assignment", help="Assignment in format key=value"
+    )
+
     # Remove command
     rm_parser = subparsers.add_parser("remove", help="Remove an item from config")
     rm_parser.add_argument(
@@ -501,6 +643,15 @@ def main():
     )
     rm_parser.add_argument("group", help="Group name")
     rm_parser.add_argument("search", help="Search term (fuzzy match)")
+
+    # Remove-persistent command
+    rm_persistent_parser = subparsers.add_parser(
+        "remove-persistent", help="Remove an item from the persistent group"
+    )
+    rm_persistent_parser.add_argument(
+        "type", choices=["alias", "env", "function"], help="Type of item to remove"
+    )
+    rm_persistent_parser.add_argument("search", help="Search term (fuzzy match)")
 
     # Activate command
     activate_parser = subparsers.add_parser("activate", help="Activate a group")
@@ -541,8 +692,12 @@ def main():
         cmd_generate(args)
     elif args.command == "add":
         cmd_add(args)
+    elif args.command == "add-persistent":
+        cmd_add_persistent(args)
     elif args.command == "remove":
         cmd_remove(args)
+    elif args.command == "remove-persistent":
+        cmd_remove_persistent(args)
     elif args.command == "activate":
         cmd_activate(args)
     elif args.command == "deactivate":
