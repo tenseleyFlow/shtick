@@ -24,7 +24,7 @@ def cmd_generate(args) -> None:
         config.load()
 
         generator = Generator()
-        generator.generate_all(config, interactive=args.interactive)
+        generator.generate_all(config, interactive=not args.terse)
 
     except FileNotFoundError as e:
         print(f"Error: {e}")
@@ -481,10 +481,9 @@ def main():
     )
     gen_parser.add_argument("config", nargs="?", help="Path to config TOML file")
     gen_parser.add_argument(
-        "-i",
-        "--interactive",
+        "--terse",
         action="store_true",
-        help="Interactive shell selection for sourcing instructions",
+        help="Skip interactive shell selection and show minimal output",
     )
 
     # Add command
