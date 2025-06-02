@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shtick"
+version = "1.0.0"
+description = "Shell alias manager - generates shell configuration files from TOML"
+readme = "README.md"
+authors = [{name = "Matthew Forrester Wolffe", email = "espadonne@outlook.com"}]
+license = {text = "MIT"}
+requires-python = ">=3.11"
+keywords = ["shell", "alias", "bash", "zsh", "fish", "configuration", "dotfiles"]
+
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console", 
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Shells",
+    "Topic :: Utilities",
+]
+
+# make 'shtick' command available globally
+[project.scripts]
+shtick = "shtick.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest", "black", "flake8", "mypy"]
+
+# Tell setuptools where to find packages
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+
+# type checking
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
