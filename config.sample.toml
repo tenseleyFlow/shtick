@@ -1,0 +1,73 @@
+# Shtick Test Configuration
+
+# Persistent items - always active in every shell session
+[persistent.aliases]
+c = "clear"
+gad="git add"
+pls="sudo !!"
+bk = "- || cd -"
+refresh = "source ${HOME}/.zshrc"
+goclass = "cd ${HOME}/Documents/Class/"
+goproj = "cd ${HOME}/Documents/Project/"
+goorg = "cd ${HOME}/Documents/GithubOrgs/"
+goterse = "cd ${HOME}/Documents/GithubOrgs/tenselyflow"
+zconfig = "micro ${HOME}/.zshrc || ${EDITOR} ${HOME}/.zshrc"
+godot = "cd ${HOME}/Documents/GithubOrgs/tenselyflow/ndotfiles"
+
+gas="git status"
+gall="git add --all"
+gcomm="git commit --message"
+gpull="git pull origin trunk"
+gputt="git push origin trunk"
+gcamm="git commit --all --message"
+glogg="git log --online --graph --decorate --all"
+
+wttr = "curl wttr.in"
+
+
+[persistent.env_vars] 
+PAGER = "less"
+EDITOR = "micro"
+BROWSER = "firefox"
+HISTSIZE = "10000"
+
+[persistent.functions]
+mkcd = "mkdir -p \"$1\" && cd \"$1\""
+backup = "cp \"$1\" \"$1.backup.$(date +%Y%m%d_%H%M%S)\""
+
+
+[dev.aliases]
+mk = "make"
+mka =  "make all"
+mkr =  "make run"
+mkt =  "make test"
+mkc =  "make clean"
+mki =  "make install"
+
+gfort = "gfortran"
+dev = "npm run dev"
+ni = "npm --install"
+setpy = "asdf set python"
+mange = "python manage.py"
+setnode = "asdf set nodejs"
+serve = "python manage.py runserver"
+pyserve = "python3 -m http.server 8000"
+brewup = "brew update && brew upgrade && brew cleanup"
+
+
+[dev.env_vars]
+JOM = "terry"
+
+[dev.functions]
+newproject = "mkdir -p \"$HOME/projects/$1\" && cd \"$HOME/projects/$1\" && git init"
+
+
+
+[personal.aliases]
+myip = "curl ifconfig.me"
+
+[personal.env_vars]
+TOM = "JERRY"
+
+[personal.functions]
+note = "echo \"$(date): $*\" >> $HOME/notes.txt"
