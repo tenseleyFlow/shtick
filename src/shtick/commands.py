@@ -1,27 +1,36 @@
 """
-Command implementations for shtick CLI
+Command implementations for shtick CLI - REFACTORED to use ShtickManager
 """
 
 import os
 import sys
 import subprocess
+import logging
 from typing import Optional, List
 
+from shtick.shtick import ShtickManager
 from shtick.config import Config
-from shtick.generator import Generator
-from shtick.shells import get_supported_shells
+
+logger = logging.getLogger("shtick")
 
 
 class ShtickCommands:
-    """Central command handler for shtick operations"""
+    """Central command handler for shtick operations - now using ShtickManager"""
 
     def __init__(self, debug: bool = False):
-        self.debug = debug
+        # Set up logging based on debug flag
+        if debug:
+            logging.basicConfig(
+                level=logging.DEBUG, format="%(name)s - %(levelname)s - %(message)s"
+            )
+        else:
+            logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+        self.manager = ShtickManager(debug=debug)
 
     def get_current_shell(self) -> Optional[str]:
-        """Detect the current shell"""
-        shell_path = os.environ.get("SHELL", "")
-        return os.path.basename(shell_path) if shell_path else None
+        """Use cached shell detection from Config"""
+        return Config.get_current_shell()
 
     def validate_assignment(self, assignment: str) -> tuple[str, str]:
         """Validate key=value assignment format and return key, value"""
@@ -43,84 +52,6 @@ class ShtickCommands:
 
         return key, value
 
-    def check_conflicts(
-        self, config: Config, item_type: str, group_name: str, key: str
-    ) -> List[str]:
-        """Check for potential conflicts and warn user"""
-        warnings = []
-
-        # Check if item already exists in same group
-        group = config.get_group(group_name)
-        if group:
-            existing_value = None
-            if item_type == "alias" and key in group.aliases:
-                existing_value = group.aliases[key]
-            elif item_type == "env" and key in group.env_vars:
-                existing_value = group.env_vars[key]
-            elif item_type == "function" and key in group.functions:
-                existing_value = group.functions[key]
-
-            if existing_value:
-                warnings.append(
-                    f"Will overwrite existing {item_type} '{key}' = '{existing_value}' in group '{group_name}'"
-                )
-
-        # Check if item exists in other groups
-        for other_group in config.groups:
-            if other_group.name == group_name:
-                continue
-
-            if item_type == "alias" and key in other_group.aliases:
-                warnings.append(
-                    f"Alias '{key}' also exists in group '{other_group.name}' = '{other_group.aliases[key]}'"
-                )
-            elif item_type == "env" and key in other_group.env_vars:
-                warnings.append(
-                    f"Environment variable '{key}' also exists in group '{other_group.name}' = '{other_group.env_vars[key]}'"
-                )
-            elif item_type == "function" and key in other_group.functions:
-                warnings.append(
-                    f"Function '{key}' also exists in group '{other_group.name}' = '{other_group.functions[key]}'"
-                )
-
-        return warnings
-
-    def handle_warnings(self, warnings: List[str]) -> bool:
-        """Handle conflict warnings and return True if user wants to continue"""
-        if not warnings:
-            return True
-
-        print("Warnings:")
-        for warning in warnings:
-            print(f"  - {warning}")
-        try:
-            response = input("Continue anyway? [y/N]: ").strip().lower()
-            return response in ["y", "yes"]
-        except (KeyboardInterrupt, EOFError):
-            print("\nCancelled")
-            return False
-
-    def regenerate_and_offer_source(self, config: Config, group_name: str = None):
-        """Regenerate shell files and offer auto-sourcing"""
-        try:
-            generator = Generator()
-
-            if group_name:
-                group = config.get_group(group_name)
-                if group:
-                    generator.generate_for_group(group)
-            else:
-                # Regenerate all groups
-                for group in config.groups:
-                    generator.generate_for_group(group)
-
-            generator.generate_loader(config)
-            print("✓ Regenerated shell files")
-            self.offer_auto_source()
-        except Exception as e:
-            print(f"Warning: Failed to regenerate files: {e}")
-            print("Run 'shtick generate' to update shell files")
-
     def offer_auto_source(self):
         """Offer to source shtick in current shell session"""
         current_shell = self.get_current_shell()
@@ -141,42 +72,9 @@ class ShtickCommands:
                 .lower()
             )
             if response in ["", "y", "yes"]:
-                # Test syntax first
-                if self._test_loader_syntax(current_shell, loader_path):
-                    self._show_source_instructions(current_shell)
+                self._show_source_instructions(current_shell)
         except (KeyboardInterrupt, EOFError):
             print()
-
-    def _test_loader_syntax(self, shell: str, loader_path: str) -> bool:
-        """Test loader file syntax and return True if valid"""
-        try:
-            test_response = (
-                input("Test the loader file for syntax errors? [Y/n]: ").strip().lower()
-            )
-            if test_response not in ["", "y", "yes"]:
-                return True
-
-            result = subprocess.run(
-                [shell, "-c", f'source "{loader_path}"'],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-
-            if result.returncode == 0:
-                print("✓ Loader file syntax is valid")
-                return True
-            else:
-                print("✗ Loader file has syntax errors:")
-                print(result.stderr)
-                print("Please fix the errors before sourcing.")
-                return False
-        except subprocess.TimeoutExpired:
-            print("✓ Loader file appears to work (test timed out, which is normal)")
-            return True
-        except Exception as e:
-            print(f"Could not test loader file: {e}")
-            return True
 
     def _show_source_instructions(self, shell: str):
         """Show instructions for sourcing"""
@@ -275,7 +173,7 @@ class ShtickCommands:
                     print(f"✓ Added shtick integration to {config_file}")
                     return True
                 except Exception as e:
-                    print(f"✗ Failed to modify {config_file}: {e}")
+                    logger.error(f"Failed to modify {config_file}: {e}")
                     continue
 
         # If no existing config file found, create the primary one
@@ -289,27 +187,29 @@ class ShtickCommands:
             print(f"✓ Created {primary_config} with shtick integration")
             return True
         except Exception as e:
-            print(f"✗ Failed to create {primary_config}: {e}")
+            logger.error(f"Failed to create {primary_config}: {e}")
             return False
 
-    # Command implementations
+    # Command implementations - now using ShtickManager
     def generate(self, config_path: str = None, terse: bool = False):
         """Generate shell files from config"""
-        config_path = config_path or Config.get_default_config_path()
-
         try:
-            config = Config(config_path, debug=self.debug)
-            config.load()
+            if config_path:
+                # Create a new manager with custom config path
+                manager = ShtickManager(config_path=config_path)
+            else:
+                manager = self.manager
 
-            generator = Generator()
-            generator.generate_all(config, interactive=not terse)
-
-            if not terse:
+            success = manager.generate_shell_files()
+            if success and not terse:
                 self.check_shell_integration()
+            elif not success:
+                print("Error: Failed to generate shell files")
+                sys.exit(1)
 
         except FileNotFoundError as e:
             print(f"Error: {e}")
-            print(f"Create a config file at {config_path} first")
+            print(f"Create a config file first")
             sys.exit(1)
         except Exception as e:
             print(f"Error: {e}")
@@ -323,31 +223,27 @@ class ShtickCommands:
             print(f"Error: {e}")
             sys.exit(1)
 
-        config_path = Config.get_default_config_path()
+        # Dispatch to appropriate manager method
+        if item_type == "alias":
+            success = self.manager.add_alias(key, value, group)
+        elif item_type == "env":
+            success = self.manager.add_env(key, value, group)
+        elif item_type == "function":
+            success = self.manager.add_function(key, value, group)
+        else:
+            print(f"Error: Unknown item type '{item_type}'")
+            sys.exit(1)
 
-        try:
-            config = Config(config_path, debug=self.debug)
-            try:
-                config.load()
-            except FileNotFoundError:
-                print(f"Creating new config file at {config_path}")
-
-            # Check for conflicts and get user confirmation
-            warnings = self.check_conflicts(config, item_type, group, key)
-            if not self.handle_warnings(warnings):
-                return
-
-            config.add_item(item_type, group, key, value)
-            config.save()
-
+        if success:
             print(f"✓ Added {item_type} '{key}' = '{value}' to group '{group}'")
-
-            # Auto-regenerate if group is active
-            if config.is_group_active(group) or group == "persistent":
-                self.regenerate_and_offer_source(config, group)
-
-        except Exception as e:
-            print(f"Error: {e}")
+            # Check if group is active and offer to source
+            if (
+                self.manager.get_active_groups()
+                and group in self.manager.get_active_groups()
+            ):
+                self.offer_auto_source()
+        else:
+            print(f"Error: Failed to add {item_type}")
             sys.exit(1)
 
     def add_persistent(self, item_type: str, assignment: str):
@@ -358,50 +254,43 @@ class ShtickCommands:
             print(f"Error: {e}")
             sys.exit(1)
 
-        config_path = Config.get_default_config_path()
-        is_first_time = not os.path.exists(config_path)
+        is_first_time = not os.path.exists(Config.get_default_config_path())
 
-        try:
-            config = Config(config_path, debug=self.debug)
-            try:
-                config.load()
-            except FileNotFoundError:
-                print(f"Creating new config file at {config_path}")
+        # Dispatch to appropriate manager method
+        if item_type == "alias":
+            success = self.manager.add_persistent_alias(key, value)
+        elif item_type == "env":
+            success = self.manager.add_persistent_env(key, value)
+        elif item_type == "function":
+            success = self.manager.add_persistent_function(key, value)
+        else:
+            print(f"Error: Unknown item type '{item_type}'")
+            sys.exit(1)
 
-            # Check for conflicts
-            warnings = self.check_conflicts(config, item_type, "persistent", key)
-            if not self.handle_warnings(warnings):
-                return
-
-            config.add_item(item_type, "persistent", key, value)
-            config.save()
-
+        if success:
             print(
                 f"✓ Added {item_type} '{key}' = '{value}' to persistent group (always active)"
             )
-
-            # Auto-regenerate files
-            self.regenerate_and_offer_source(config, "persistent")
+            self.offer_auto_source()
 
             # First-time setup experience
             if is_first_time:
                 print("\n🎉 Welcome to shtick!")
                 self.check_shell_integration()
-
-        except Exception as e:
-            print(f"Error: {e}")
+        else:
+            print(f"Error: Failed to add {item_type}")
             sys.exit(1)
 
     def remove_item(self, item_type: str, group: str, search: str):
         """Remove an item from a group"""
-        config_path = Config.get_default_config_path()
-
         try:
-            config = Config(config_path, debug=self.debug)
-            config.load()
-
-            # Find matching items
-            matches = config.find_items(item_type, group, search)
+            # Use manager's list_items to find matches
+            all_items = self.manager.list_items(group)
+            matches = [
+                item["key"]
+                for item in all_items
+                if item["type"] == item_type and search.lower() in item["key"].lower()
+            ]
 
             if not matches:
                 print(
@@ -414,19 +303,25 @@ class ShtickCommands:
             if not item_to_remove:
                 return
 
-            if config.remove_item(item_type, group, item_to_remove):
-                config.save()
-                print(f"✓ Removed {item_type} '{item_to_remove}' from group '{group}'")
+            # Dispatch to appropriate manager method
+            if item_type == "alias":
+                success = self.manager.remove_alias(item_to_remove, group)
+            elif item_type == "env":
+                success = self.manager.remove_env(item_to_remove, group)
+            elif item_type == "function":
+                success = self.manager.remove_function(item_to_remove, group)
+            else:
+                print(f"Error: Unknown item type '{item_type}'")
+                return
 
-                # Auto-regenerate if group is active
-                if config.is_group_active(group) or group == "persistent":
-                    self.regenerate_and_offer_source(config, group)
+            if success:
+                print(f"✓ Removed {item_type} '{item_to_remove}' from group '{group}'")
+                # Offer to source if group is active
+                if group == "persistent" or group in self.manager.get_active_groups():
+                    self.offer_auto_source()
             else:
                 print(f"Failed to remove {item_type} '{item_to_remove}'")
 
-        except FileNotFoundError:
-            print(f"Config file not found: {config_path}")
-            sys.exit(1)
         except Exception as e:
             print(f"Error: {e}")
             sys.exit(1)
@@ -459,69 +354,36 @@ class ShtickCommands:
 
     def activate_group(self, group_name: str):
         """Activate a group"""
-        config_path = Config.get_default_config_path()
+        if group_name == "persistent":
+            print(
+                "Error: 'persistent' group is always active and cannot be manually activated"
+            )
+            return
 
-        try:
-            config = Config(config_path, debug=self.debug)
-            config.load()
-
-            if group_name == "persistent":
-                print(
-                    "Error: 'persistent' group is always active and cannot be manually activated"
-                )
-                return
-
-            if config.activate_group(group_name):
-                self.regenerate_and_offer_source(config)
-                print(f"✓ Activated group '{group_name}'")
-                print("Changes are now active in new shell sessions")
-            else:
-                print(f"Error: Group '{group_name}' not found in configuration")
-                available = [g.name for g in config.get_regular_groups()]
-                if available:
-                    print(f"Available groups: {', '.join(available)}")
-
-        except FileNotFoundError:
-            print(f"Config file not found: {config_path}")
-            print("Run 'shtick generate' first or add some items with 'shtick add'")
-            sys.exit(1)
-        except Exception as e:
-            print(f"Error: {e}")
-            sys.exit(1)
+        success = self.manager.activate_group(group_name)
+        if success:
+            print(f"✓ Activated group '{group_name}'")
+            print("Changes are now active in new shell sessions")
+            self.offer_auto_source()
+        else:
+            print(f"Error: Group '{group_name}' not found in configuration")
+            available = self.manager.get_groups()
+            if available:
+                print(f"Available groups: {', '.join(available)}")
 
     def deactivate_group(self, group_name: str):
         """Deactivate a group"""
-        config_path = Config.get_default_config_path()
+        if group_name == "persistent":
+            print("Error: 'persistent' group cannot be deactivated")
+            return
 
-        try:
-            config = Config(config_path, debug=self.debug)
-            config.load()
-
-            if group_name == "persistent":
-                print("Error: 'persistent' group cannot be deactivated")
-                return
-
-            if config.deactivate_group(group_name):
-                # Only need to regenerate loader for deactivation
-                try:
-                    generator = Generator()
-                    generator.generate_loader(config)
-                    print("✓ Regenerated shell files")
-                except Exception as e:
-                    print(f"Warning: Failed to regenerate files: {e}")
-
-                print(f"✓ Deactivated group '{group_name}'")
-                print("Changes will take effect in new shell sessions")
-                self.offer_auto_source()
-            else:
-                print(f"Group '{group_name}' was not active")
-
-        except FileNotFoundError:
-            print(f"Config file not found: {config_path}")
-            sys.exit(1)
-        except Exception as e:
-            print(f"Error: {e}")
-            sys.exit(1)
+        success = self.manager.deactivate_group(group_name)
+        if success:
+            print(f"✓ Deactivated group '{group_name}'")
+            print("Changes will take effect in new shell sessions")
+            self.offer_auto_source()
+        else:
+            print(f"Group '{group_name}' was not active")
 
     def source_command(self, shell: str = None):
         """Output source command for eval"""

@@ -1,12 +1,15 @@
 """
-Configuration parsing for shtick
+Configuration parsing for shtick - REFACTORED
 """
 
 import os
 import tomllib
+import logging
 from pathlib import Path
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
+
+logger = logging.getLogger("shtick")
 
 
 @dataclass
@@ -18,13 +21,51 @@ class GroupData:
     env_vars: Dict[str, str]
     functions: Dict[str, str]
 
+    def get_items(self, item_type: str) -> Dict[str, str]:
+        """Get items dictionary for the specified type"""
+        type_map = {"alias": "aliases", "env": "env_vars", "function": "functions"}
+        attr_name = type_map.get(item_type)
+        if not attr_name:
+            raise ValueError(f"Unknown item type: {item_type}")
+        return getattr(self, attr_name)
+
+    def set_item(self, item_type: str, key: str, value: str) -> None:
+        """Set an item in the appropriate dictionary"""
+        items = self.get_items(item_type)
+        items[key] = value
+
+    def remove_item(self, item_type: str, key: str) -> bool:
+        """Remove an item if it exists"""
+        items = self.get_items(item_type)
+        if key in items:
+            del items[key]
+            return True
+        return False
+
+    def has_item(self, item_type: str, key: str) -> bool:
+        """Check if an item exists"""
+        items = self.get_items(item_type)
+        return key in items
+
+    def get_item_value(self, item_type: str, key: str) -> Optional[str]:
+        """Get the value of an item"""
+        items = self.get_items(item_type)
+        return items.get(key)
+
+    @property
+    def total_items(self) -> int:
+        """Get total number of items in this group"""
+        return len(self.aliases) + len(self.env_vars) + len(self.functions)
+
 
 class Config:
     """Main configuration handler"""
 
-    def __init__(self, config_path: Optional[str] = None, debug: bool = False):
+    # Class variable for shell detection caching
+    _detected_shell = None
+
+    def __init__(self, config_path: Optional[str] = None):
         self.config_path = config_path or self.get_default_config_path()
-        self.debug = debug
         self.groups: List[GroupData] = []
 
     @staticmethod
@@ -41,6 +82,19 @@ class Config:
     def get_active_groups_file() -> str:
         """Get the active groups state file path"""
         return os.path.expanduser("~/.config/shtick/active_groups")
+
+    @classmethod
+    def get_current_shell(cls) -> Optional[str]:
+        """Detect the current shell with caching"""
+        if cls._detected_shell is None:
+            shell_path = os.environ.get("SHELL", "")
+            cls._detected_shell = os.path.basename(shell_path) if shell_path else ""
+        return cls._detected_shell if cls._detected_shell else None
+
+    @classmethod
+    def clear_shell_cache(cls):
+        """Clear the cached shell detection (useful for testing)"""
+        cls._detected_shell = None
 
     def load_active_groups(self) -> List[str]:
         """Load list of currently active groups"""
@@ -104,28 +158,19 @@ class Config:
         if not os.path.exists(self.config_path):
             raise FileNotFoundError(f"Config file not found: {self.config_path}")
 
-        if self.debug:
-            print(f"Debug: Loading config from: {self.config_path}")
+        logger.debug(f"Loading config from: {self.config_path}")
 
         with open(self.config_path, "rb") as f:
             data = tomllib.load(f)
 
-        if self.debug:
-            print(f"Debug: Raw TOML data keys: {list(data.keys())}")
-            print(f"Debug: Raw TOML data structure: {data}")
+        logger.debug(f"Raw TOML data keys: {list(data.keys())}")
 
         self.groups = []
 
         # Parse groups from nested TOML structure
         for group_name, group_config in data.items():
-            if self.debug:
-                print(
-                    f"Debug: Processing group '{group_name}' with config: {group_config}"
-                )
-
             if not isinstance(group_config, dict):
-                if self.debug:
-                    print(f"Debug: Skipping non-dict value for key '{group_name}'")
+                logger.debug(f"Skipping non-dict value for key '{group_name}'")
                 continue
 
             # Initialize group data
@@ -133,64 +178,44 @@ class Config:
 
             # Extract each section from the group
             for section_name, section_data in group_config.items():
-                if self.debug:
-                    print(
-                        f"Debug: Processing section '{section_name}' in group '{group_name}': {section_data}"
-                    )
-
                 if section_name == "aliases" and isinstance(section_data, dict):
                     group_data["aliases"] = section_data
-                    if self.debug:
-                        print(
-                            f"Debug: Added {len(section_data)} aliases to '{group_name}'"
-                        )
+                    logger.debug(f"Added {len(section_data)} aliases to '{group_name}'")
                 elif section_name == "env_vars" and isinstance(section_data, dict):
                     group_data["env_vars"] = section_data
-                    if self.debug:
-                        print(
-                            f"Debug: Added {len(section_data)} env_vars to '{group_name}'"
-                        )
+                    logger.debug(
+                        f"Added {len(section_data)} env_vars to '{group_name}'"
+                    )
                 elif section_name == "functions" and isinstance(section_data, dict):
                     group_data["functions"] = section_data
-                    if self.debug:
-                        print(
-                            f"Debug: Added {len(section_data)} functions to '{group_name}'"
-                        )
+                    logger.debug(
+                        f"Added {len(section_data)} functions to '{group_name}'"
+                    )
                 else:
-                    if self.debug:
-                        print(
-                            f"Debug: Unknown or invalid section '{section_name}' in group '{group_name}'"
-                        )
+                    logger.debug(
+                        f"Unknown or invalid section '{section_name}' in group '{group_name}'"
+                    )
 
             # Create GroupData object if group has any items
-            total_items = (
-                len(group_data["aliases"])
-                + len(group_data["env_vars"])
-                + len(group_data["functions"])
+            new_group = GroupData(
+                name=group_name,
+                aliases=group_data["aliases"],
+                env_vars=group_data["env_vars"],
+                functions=group_data["functions"],
             )
-            if self.debug:
-                print(f"Debug: Group '{group_name}' has {total_items} total items")
 
-            if total_items > 0:
-                new_group = GroupData(
-                    name=group_name,
-                    aliases=group_data["aliases"],
-                    env_vars=group_data["env_vars"],
-                    functions=group_data["functions"],
-                )
+            if new_group.total_items > 0:
                 self.groups.append(new_group)
-                if self.debug:
-                    print(
-                        f"Debug: Created group '{group_name}' with {len(group_data['aliases'])} aliases, {len(group_data['env_vars'])} env_vars, {len(group_data['functions'])} functions"
-                    )
+                logger.debug(
+                    f"Created group '{group_name}' with {len(group_data['aliases'])} aliases, "
+                    f"{len(group_data['env_vars'])} env_vars, {len(group_data['functions'])} functions"
+                )
             else:
-                if self.debug:
-                    print(f"Warning: Group '{group_name}' has no items, skipping")
+                logger.warning(f"Group '{group_name}' has no items, skipping")
 
-        if self.debug:
-            print(
-                f"Debug: Final groups loaded: {[g.name for g in self.groups]} (total: {len(self.groups)})"
-            )
+        logger.debug(
+            f"Final groups loaded: {[g.name for g in self.groups]} (total: {len(self.groups)})"
+        )
 
     def save(self) -> None:
         """Save the current configuration back to TOML file"""
@@ -236,33 +261,14 @@ class Config:
     def add_item(self, item_type: str, group_name: str, key: str, value: str) -> None:
         """Add an alias, env var, or function to a group"""
         group = self.add_group(group_name)
-
-        if item_type == "alias":
-            group.aliases[key] = value
-        elif item_type == "env":
-            group.env_vars[key] = value
-        elif item_type == "function":
-            group.functions[key] = value
-        else:
-            raise ValueError(f"Unknown item type: {item_type}")
+        group.set_item(item_type, key, value)
 
     def remove_item(self, item_type: str, group_name: str, key: str) -> bool:
         """Remove an item from a group. Returns True if found and removed."""
         group = self.get_group(group_name)
         if not group:
             return False
-
-        if item_type == "alias" and key in group.aliases:
-            del group.aliases[key]
-            return True
-        elif item_type == "env" and key in group.env_vars:
-            del group.env_vars[key]
-            return True
-        elif item_type == "function" and key in group.functions:
-            del group.functions[key]
-            return True
-
-        return False
+        return group.remove_item(item_type, key)
 
     def find_items(
         self, item_type: str, group_name: str, search_term: str
@@ -272,14 +278,26 @@ class Config:
         if not group:
             return []
 
-        if item_type == "alias":
-            items = group.aliases.keys()
-        elif item_type == "env":
-            items = group.env_vars.keys()
-        elif item_type == "function":
-            items = group.functions.keys()
-        else:
-            return []
-
+        items = group.get_items(item_type)
         # Simple fuzzy matching - contains search term
-        return [item for item in items if search_term.lower() in item.lower()]
+        return [item for item in items.keys() if search_term.lower() in item.lower()]
+
+    def get_all_shells_to_generate(self) -> List[str]:
+        """Get list of shells to generate files for based on user settings"""
+        # For now, just detect current shell and common ones
+        # Later this can read from settings.toml
+        current_shell = self.get_current_shell()
+        if not current_shell:
+            return ["bash", "zsh", "fish"]  # Common defaults
+
+        # Include current shell and close relatives
+        shell_families = {
+            "bash": ["bash", "sh"],
+            "zsh": ["zsh", "bash"],
+            "fish": ["fish"],
+            "ksh": ["ksh", "bash"],
+            "dash": ["dash", "sh"],
+        }
+
+        shells = shell_families.get(current_shell, [current_shell])
+        return list(set(shells))  # Remove duplicates
