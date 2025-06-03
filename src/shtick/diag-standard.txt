@@ -1,0 +1,100 @@
+✓ Successfully imported shtick modules
+✓ STANDARD version detected
+============================================================
+PERFORMANCE DIAGNOSTICS - STANDARD VERSION
+============================================================
+
+Profiling: Single alias add
+--------------------------------------------------
+Time: 3.25ms
+
+Top 10 time consumers:
+         699 function calls in 0.001 seconds
+
+   Ordered by: cumulative time
+   List reduced from 90 to 10 due to restriction <10>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000    0.001    0.001 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/performanc_diagnostic.py:88(add_single)
+        1    0.000    0.000    0.001    0.001 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/shtick.py:133(add_alias)
+        1    0.000    0.000    0.001    0.001 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/shtick.py:258(_add_item)
+        1    0.000    0.000    0.001    0.001 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/shtick.py:78(_save_and_regenerate)
+        1    0.000    0.000    0.001    0.001 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/generator.py:52(generate_for_group)
+        9    0.000    0.000    0.000    0.000 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/generator.py:77(_generate_group_file)
+        1    0.000    0.000    0.000    0.000 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/generator.py:152(generate_loader)
+       19    0.000    0.000    0.000    0.000 {built-in method io.open}
+       19    0.000    0.000    0.000    0.000 {method '__exit__' of '_io._IOBase' objects}
+        1    0.000    0.000    0.000    0.000 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/config.py:258(save)
+
+
+
+Profiling: Batch add (100 items)
+--------------------------------------------------
+Time: 2.10ms
+
+Top 10 time consumers:
+         8972 function calls in 0.004 seconds
+
+   Ordered by: cumulative time
+   List reduced from 93 to 10 due to restriction <10>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000    0.004    0.004 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/performanc_diagnostic.py:97(add_batch)
+        1    0.000    0.000    0.004    0.004 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/shtick.py:321(add_items_batch)
+        1    0.000    0.000    0.002    0.002 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/shtick.py:78(_save_and_regenerate)
+        2    0.000    0.000    0.001    0.001 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/generator.py:52(generate_for_group)
+       18    0.000    0.000    0.001    0.000 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/generator.py:77(_generate_group_file)
+      100    0.000    0.000    0.001    0.000 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/config.py:177(is_group_active)
+      101    0.000    0.000    0.001    0.000 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/config.py:110(load_active_groups)
+       28    0.001    0.000    0.001    0.000 {built-in method io.open}
+       28    0.001    0.000    0.001    0.000 {method '__exit__' of '_io._IOBase' objects}
+      101    0.000    0.000    0.000    0.000 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/config.py:84(get_active_groups_file)
+
+
+
+Profiling: Conflict checking (50 checks)
+--------------------------------------------------
+Time: 0.04ms
+
+Top 10 time consumers:
+         702 function calls in 0.000 seconds
+
+   Ordered by: cumulative time
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000    0.000    0.000 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/performanc_diagnostic.py:111(check_conflicts)
+       50    0.000    0.000    0.000    0.000 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/shtick.py:97(check_conflicts)
+      150    0.000    0.000    0.000    0.000 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/config.py:45(has_item)
+      150    0.000    0.000    0.000    0.000 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/config.py:24(get_items)
+      150    0.000    0.000    0.000    0.000 {built-in method builtins.getattr}
+      150    0.000    0.000    0.000    0.000 {method 'get' of 'dict' objects}
+       50    0.000    0.000    0.000    0.000 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/shtick.py:72(_get_config)
+        1    0.000    0.000    0.000    0.000 {method 'disable' of '_lsprof.Profiler' objects}
+
+
+
+Profiling: List all items
+--------------------------------------------------
+Time: 0.84ms
+
+Top 10 time consumers:
+         6708 function calls in 0.002 seconds
+
+   Ordered by: cumulative time
+   List reduced from 33 to 10 due to restriction <10>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000    0.002    0.002 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/performanc_diagnostic.py:118(list_all)
+        1    0.000    0.000    0.002    0.002 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/shtick.py:533(list_items)
+      202    0.000    0.000    0.002    0.000 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/config.py:177(is_group_active)
+      202    0.000    0.000    0.002    0.000 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/config.py:110(load_active_groups)
+      202    0.000    0.000    0.001    0.000 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/config.py:84(get_active_groups_file)
+      202    0.000    0.000    0.001    0.000 <frozen posixpath>:229(expanduser)
+      404    0.000    0.000    0.000    0.000 {built-in method posix.stat}
+      404    0.000    0.000    0.000    0.000 <frozen os>:674(__getitem__)
+      202    0.000    0.000    0.000    0.000 <frozen genericpath>:16(exists)
+      202    0.000    0.000    0.000    0.000 <frozen genericpath>:53(getmtime)
+
+
+
+✓ Diagnostic complete

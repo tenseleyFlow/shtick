@@ -1,0 +1,107 @@
+✓ Successfully imported shtick modules
+✓ OPTIMIZED version detected
+============================================================
+PERFORMANCE DIAGNOSTICS - OPTIMIZED VERSION
+============================================================
+
+Profiling: Single alias add
+--------------------------------------------------
+Time: 5.63ms
+
+Top 10 time consumers:
+         1695 function calls (1687 primitive calls) in 0.002 seconds
+
+   Ordered by: cumulative time
+   List reduced from 154 to 10 due to restriction <10>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000    0.002    0.002 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/performanc_diagnostic.py:88(add_single)
+        1    0.000    0.000    0.002    0.002 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/shtick.py:218(add_alias)
+        1    0.000    0.000    0.002    0.002 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/shtick.py:343(_add_item)
+        1    0.000    0.000    0.002    0.002 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/shtick.py:107(_save_and_regenerate)
+        1    0.000    0.000    0.002    0.002 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/generator.py:381(generate_loader)
+       19    0.000    0.000    0.001    0.000 {built-in method io.open}
+        9    0.000    0.000    0.001    0.000 /Users/matthewwolffe/.asdf/installs/python/3.11.6/lib/python3.11/tempfile.py:522(NamedTemporaryFile)
+        1    0.000    0.000    0.001    0.001 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/generator.py:96(generate_for_group)
+        9    0.001    0.000    0.001    0.000 {built-in method posix.replace}
+        9    0.000    0.000    0.001    0.000 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/generator.py:179(_generate_group_file)
+
+
+
+Profiling: Batch add (100 items)
+--------------------------------------------------
+Time: 3.29ms
+
+Top 10 time consumers:
+         15000 function calls (14788 primitive calls) in 0.006 seconds
+
+   Ordered by: cumulative time
+   List reduced from 154 to 10 due to restriction <10>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000    0.006    0.006 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/performanc_diagnostic.py:97(add_batch)
+        1    0.000    0.000    0.006    0.006 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/shtick.py:441(add_items_batch)
+        1    0.000    0.000    0.004    0.004 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/shtick.py:107(_save_and_regenerate)
+        2    0.000    0.000    0.002    0.001 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/generator.py:96(generate_for_group)
+       18    0.000    0.000    0.002    0.000 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/generator.py:179(_generate_group_file)
+        1    0.000    0.000    0.001    0.001 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/generator.py:381(generate_loader)
+      100    0.000    0.000    0.001    0.000 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/config.py:226(is_group_active)
+      101    0.000    0.000    0.001    0.000 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/config.py:159(load_active_groups)
+       28    0.000    0.000    0.001    0.000 {built-in method io.open}
+        9    0.001    0.000    0.001    0.000 {built-in method posix.replace}
+
+
+
+Profiling: Conflict checking (50 checks)
+--------------------------------------------------
+Time: 0.03ms
+
+Top 10 time consumers:
+         102 function calls in 0.000 seconds
+
+   Ordered by: cumulative time
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000    0.000    0.000 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/performanc_diagnostic.py:111(check_conflicts)
+       50    0.000    0.000    0.000    0.000 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/shtick.py:168(check_conflicts)
+       50    0.000    0.000    0.000    0.000 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/shtick.py:184(<listcomp>)
+        1    0.000    0.000    0.000    0.000 {method 'disable' of '_lsprof.Profiler' objects}
+
+
+
+Profiling: List all items
+--------------------------------------------------
+Time: 0.82ms
+
+Top 10 time consumers:
+         6708 function calls in 0.002 seconds
+
+   Ordered by: cumulative time
+   List reduced from 33 to 10 due to restriction <10>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000    0.002    0.002 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/performanc_diagnostic.py:118(list_all)
+        1    0.000    0.000    0.002    0.002 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/shtick.py:704(list_items)
+      202    0.000    0.000    0.002    0.000 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/config.py:226(is_group_active)
+      202    0.000    0.000    0.002    0.000 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/config.py:159(load_active_groups)
+      202    0.000    0.000    0.001    0.000 /Users/matthewwolffe/Documents/GithubOrgs/tenselyflow/shtickpy/src/shtick/config.py:115(get_active_groups_file)
+      202    0.000    0.000    0.001    0.000 <frozen posixpath>:229(expanduser)
+      404    0.001    0.000    0.001    0.000 {built-in method posix.stat}
+      404    0.000    0.000    0.000    0.000 <frozen os>:674(__getitem__)
+      202    0.000    0.000    0.000    0.000 <frozen genericpath>:16(exists)
+      202    0.000    0.000    0.000    0.000 <frozen genericpath>:53(getmtime)
+
+
+
+============================================================
+OPTIMIZED VERSION SPECIFIC CHECKS
+============================================================
+
+LRU Cache stats:
+  Hits: 49
+  Misses: 1
+  Hit rate: 98.0%
+
+Cache clears during 10 adds: 10
+
+✓ Diagnostic complete
