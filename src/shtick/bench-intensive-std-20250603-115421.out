@@ -1,0 +1,310 @@
+SHTICK INTENSIVE PERFORMANCE BENCHMARK RESULTS
+Version: STANDARD
+Timestamp: 2025-06-03 11:54:21
+================================================================================
+
+PERFORMANCE SUMMARY (all times in milliseconds)
+--------------------------------------------------------------------------------
+Category                  Operation                                      Mean    Items/sec
+--------------------------------------------------------------------------------
+Batch Operations          Batch add (10 items)                           3.23        3,098
+Batch Operations          Batch add (100 items)                          5.45       18,362
+Batch Operations          Batch add (50 items)                           3.99       12,526
+Batch Operations          Batch add (500 items)                         13.55       36,899
+Conflict Checking         Check 100 new items                            0.20             
+Conflict Checking         Check 50 existing items                        0.06             
+Conflict Checking         Repeated 200 checks                            0.23             
+File Generation           Generate 10 items                              0.56             
+File Generation           Generate 100 items                             1.00             
+File Generation           Generate 500 items                             3.33             
+List Operations           List all (2085 items)                          8.09      257,729
+List Operations           List group (250 items)                         0.96      260,917
+Stress Test               100 conflict checks                            0.63             
+Stress Test               Create 9220 items                          90870.68             
+Stress Test               List 9220 items                               44.80             
+
+
+OPTIMIZATION IMPACT
+================================================================================
+This is the standard version without optimizations.
+Compare with optimized version to see improvements.
+
+
+DETAILED RESULTS
+================================================================================
+
+Batch Operations:
+----------------
+  Batch add (10 items):
+    Mean:   3.228ms
+    Median: 3.227ms
+    Min:    3.209ms
+    Max:    3.242ms
+    StdDev: 0.014ms
+
+  Batch add (100 items):
+    Mean:   5.446ms
+    Median: 5.472ms
+    Min:    5.168ms
+    Max:    5.721ms
+    StdDev: 0.228ms
+
+  Batch add (50 items):
+    Mean:   3.992ms
+    Median: 3.941ms
+    Min:    3.767ms
+    Max:    4.274ms
+    StdDev: 0.197ms
+
+  Batch add (500 items):
+    Mean:   13.550ms
+    Median: 13.411ms
+    Min:    12.449ms
+    Max:    14.635ms
+    StdDev: 0.823ms
+
+
+Conflict Checking:
+-----------------
+  Check 100 new items:
+    Mean:   0.200ms
+    Median: 0.200ms
+    Min:    0.198ms
+    Max:    0.203ms
+    StdDev: 0.002ms
+
+  Check 50 existing items:
+    Mean:   0.065ms
+    Median: 0.065ms
+    Min:    0.062ms
+    Max:    0.069ms
+    StdDev: 0.002ms
+
+  Repeated 200 checks:
+    Mean:   0.226ms
+    Median: 0.231ms
+    Min:    0.216ms
+    Max:    0.237ms
+    StdDev: 0.009ms
+    Notes:  No cache
+
+
+File Generation:
+---------------
+  Generate 10 items:
+    Mean:   0.565ms
+    Median: 0.546ms
+    Min:    0.523ms
+    Max:    0.670ms
+    StdDev: 0.060ms
+
+  Generate 100 items:
+    Mean:   1.002ms
+    Median: 1.000ms
+    Min:    0.997ms
+    Max:    1.013ms
+    StdDev: 0.006ms
+
+  Generate 500 items:
+    Mean:   3.331ms
+    Median: 3.336ms
+    Min:    3.308ms
+    Max:    3.348ms
+    StdDev: 0.015ms
+
+
+List Operations:
+---------------
+  List all (2085 items):
+    Mean:   8.090ms
+    Median: 8.034ms
+    Min:    8.003ms
+    Max:    8.290ms
+    StdDev: 0.099ms
+
+  List group (250 items):
+    Mean:   0.958ms
+    Median: 0.954ms
+    Min:    0.948ms
+    Max:    1.037ms
+    StdDev: 0.016ms
+
+
+Stress Test:
+-----------
+  100 conflict checks:
+    Mean:   0.627ms
+    Median: 0.627ms
+    Min:    0.627ms
+    Max:    0.627ms
+
+  Create 9220 items:
+    Mean:   90870.682ms
+    Median: 90870.682ms
+    Min:    90870.682ms
+    Max:    90870.682ms
+
+  List 9220 items:
+    Mean:   44.800ms
+    Median: 44.800ms
+    Min:    44.800ms
+    Max:    44.800ms
+
+
+
+JSON DATA
+================================================================================
+{
+  "timestamp": "2025-06-03T11:54:21.645479",
+  "version": {
+    "optimized": false,
+    "version": "standard"
+  },
+  "results": {
+    "Conflict Checking": {
+      "Check 100 new items": {
+        "mean_ms": 0.19976659677922726,
+        "median_ms": 0.19987499399576336,
+        "min_ms": 0.1976249914150685,
+        "max_ms": 0.20287498773541301,
+        "stdev_ms": 0.0016819038643054256,
+        "total_ms": 1.9976659677922726,
+        "notes": null
+      },
+      "Check 50 existing items": {
+        "mean_ms": 0.06486269849119708,
+        "median_ms": 0.06468799983849749,
+        "min_ms": 0.062040999182499945,
+        "max_ms": 0.06883298920001835,
+        "stdev_ms": 0.0017550841541276853,
+        "total_ms": 0.6486269849119708,
+        "notes": null
+      },
+      "Repeated 200 checks": {
+        "mean_ms": 0.2264832000946626,
+        "median_ms": 0.2308750117663294,
+        "min_ms": 0.21570800163317472,
+        "max_ms": 0.2365830005146563,
+        "stdev_ms": 0.00908157947525854,
+        "total_ms": 1.132416000473313,
+        "notes": "No cache"
+      }
+    },
+    "List Operations": {
+      "List all (2085 items)": {
+        "mean_ms": 8.089879150793422,
+        "median_ms": 8.034228994802106,
+        "min_ms": 8.0033749982249,
+        "max_ms": 8.289582998258993,
+        "stdev_ms": 0.09929102639440149,
+        "total_ms": 161.79758301586844,
+        "notes": null
+      },
+      "List group (250 items)": {
+        "mean_ms": 0.9581596983480267,
+        "median_ms": 0.9536454963381402,
+        "min_ms": 0.9481670131208375,
+        "max_ms": 1.0370829986641183,
+        "stdev_ms": 0.016379093805541322,
+        "total_ms": 28.7447909504408,
+        "notes": null
+      }
+    },
+    "Batch Operations": {
+      "Batch add (10 items)": {
+        "mean_ms": 3.228024998679757,
+        "median_ms": 3.2270000083371997,
+        "min_ms": 3.208999987691641,
+        "max_ms": 3.2422499934909865,
+        "stdev_ms": 0.014315564924933228,
+        "total_ms": 16.140124993398786,
+        "notes": null
+      },
+      "Batch add (50 items)": {
+        "mean_ms": 3.991674995631911,
+        "median_ms": 3.940665992558934,
+        "min_ms": 3.7672089965781197,
+        "max_ms": 4.273583996109664,
+        "stdev_ms": 0.1965963398676063,
+        "total_ms": 19.958374978159554,
+        "notes": null
+      },
+      "Batch add (100 items)": {
+        "mean_ms": 5.4461499996250495,
+        "median_ms": 5.471624986967072,
+        "min_ms": 5.168375006178394,
+        "max_ms": 5.720916989957914,
+        "stdev_ms": 0.2275580434526712,
+        "total_ms": 27.230749998125248,
+        "notes": null
+      },
+      "Batch add (500 items)": {
+        "mean_ms": 13.550433397176675,
+        "median_ms": 13.41149999643676,
+        "min_ms": 12.449041998479515,
+        "max_ms": 14.63524998689536,
+        "stdev_ms": 0.8227566197321062,
+        "total_ms": 67.75216698588338,
+        "notes": null
+      }
+    },
+    "File Generation": {
+      "Generate 10 items": {
+        "mean_ms": 0.5649332015309483,
+        "median_ms": 0.5462499975692481,
+        "min_ms": 0.5231660034041852,
+        "max_ms": 0.6704999977955595,
+        "stdev_ms": 0.06018051805445241,
+        "total_ms": 2.8246660076547414,
+        "notes": null
+      },
+      "Generate 100 items": {
+        "mean_ms": 1.0023833980085328,
+        "median_ms": 1.0002089984482154,
+        "min_ms": 0.99741700978484,
+        "max_ms": 1.0132919996976852,
+        "stdev_ms": 0.006281655200173555,
+        "total_ms": 5.011916990042664,
+        "notes": null
+      },
+      "Generate 500 items": {
+        "mean_ms": 3.3309332007775083,
+        "median_ms": 3.336375011713244,
+        "min_ms": 3.3084579918067902,
+        "max_ms": 3.3481669961474836,
+        "stdev_ms": 0.015304386788294877,
+        "total_ms": 16.65466600388754,
+        "notes": null
+      }
+    },
+    "Stress Test": {
+      "Create 9220 items": {
+        "mean_ms": 90870.68245800037,
+        "median_ms": 90870.68245800037,
+        "min_ms": 90870.68245800037,
+        "max_ms": 90870.68245800037,
+        "stdev_ms": 0,
+        "total_ms": 0,
+        "notes": null
+      },
+      "List 9220 items": {
+        "mean_ms": 44.80020800838247,
+        "median_ms": 44.80020800838247,
+        "min_ms": 44.80020800838247,
+        "max_ms": 44.80020800838247,
+        "stdev_ms": 0,
+        "total_ms": 0,
+        "notes": null
+      },
+      "100 conflict checks": {
+        "mean_ms": 0.6272090104175732,
+        "median_ms": 0.6272090104175732,
+        "min_ms": 0.6272090104175732,
+        "max_ms": 0.6272090104175732,
+        "stdev_ms": 0,
+        "total_ms": 0,
+        "notes": null
+      }
+    }
+  }
+}

@@ -12,6 +12,107 @@ from typing import Dict, List, Optional, Union
 logger = logging.getLogger("shtick")
 
 
+def escape_toml_value(value: str) -> str:
+    """
+    Properly escape a string value for TOML with security considerations.
+
+    Args:
+        value: String value to escape
+
+    Returns:
+        Properly escaped TOML string
+    """
+    # Check if we need multi-line literal string
+    if "\n" in value or "\r" in value:
+        # Use multi-line literal string (no escaping needed)
+        # But check for ''' to avoid breaking out of literal string
+        if "'''" in value:
+            # Fall back to basic string with escaping
+            escaped = value.replace("\\", "\\\\")  # Backslash first
+            escaped = escaped.replace('"', '\\"')  # Quotes
+            escaped = escaped.replace("\t", "\\t")  # Tab
+            escaped = escaped.replace("\r", "\\r")  # Carriage return
+            escaped = escaped.replace("\n", "\\n")  # Newline
+            return f'"{escaped}"'
+        else:
+            return f"'''\n{value}'''"
+
+    # Check if we need basic string with escaping
+    needs_escape = any(c in value for c in ['"', "\\", "\t", "\r", "\n"])
+
+    if needs_escape:
+        # Escape special characters
+        escaped = value.replace("\\", "\\\\")  # Backslash first
+        escaped = escaped.replace('"', '\\"')  # Quotes
+        escaped = escaped.replace("\t", "\\t")  # Tab
+        escaped = escaped.replace("\r", "\\r")  # Carriage return
+        escaped = escaped.replace(
+            "\n", "\\n"
+        )  # Newline (shouldn't happen due to check above)
+        return f'"{escaped}"'
+
+    # Simple string
+    return f'"{value}"'
+
+
+def save_config_securely(config_path: str, groups) -> None:
+    """
+    Save configuration to TOML file with proper escaping.
+
+    Args:
+        config_path: Path to save config file
+        groups: List of GroupData objects to save
+    """
+    from pathlib import Path
+
+    # Ensure directory exists
+    Path(config_path).parent.mkdir(parents=True, exist_ok=True)
+
+    # Try to use proper TOML library if available
+    try:
+        import tomli_w
+
+        data = {}
+        for group in groups:
+            group_data = {}
+            if group.aliases:
+                group_data["aliases"] = group.aliases
+            if group.env_vars:
+                group_data["env_vars"] = group.env_vars
+            if group.functions:
+                group_data["functions"] = group.functions
+            if group_data:
+                data[group.name] = group_data
+
+        with open(config_path, "wb") as f:
+            tomli_w.dump(data, f)
+
+    except ImportError:
+        # Fallback with proper escaping
+        data = {}
+        for group in groups:
+            if group.aliases:
+                data[f"{group.name}.aliases"] = group.aliases
+            if group.env_vars:
+                data[f"{group.name}.env_vars"] = group.env_vars
+            if group.functions:
+                data[f"{group.name}.functions"] = group.functions
+
+        # Write TOML manually with proper escaping
+        with open(config_path, "w") as f:
+            # Sort sections for consistent output
+            for section in sorted(data.keys()):
+                items = data[section]
+                f.write(f"[{section}]\n")
+                # Sort items within section
+                for key in sorted(items.keys()):
+                    value = items[key]
+                    # Use proper TOML escaping
+                    escaped_value = escape_toml_value(value)
+                    f.write(f"{key} = {escaped_value}\n")
+                f.write("\n")
+
+
 @dataclass
 class GroupData:
     """Holds parsed data for a single group"""
@@ -256,28 +357,8 @@ class Config:
         )
 
     def save(self) -> None:
-        """Save the current configuration back to TOML file"""
-        self.ensure_config_dir()
-
-        # Convert groups back to TOML structure
-        data = {}
-        for group in self.groups:
-            if group.aliases:
-                data[f"{group.name}.aliases"] = group.aliases
-            if group.env_vars:
-                data[f"{group.name}.env_vars"] = group.env_vars
-            if group.functions:
-                data[f"{group.name}.functions"] = group.functions
-
-        # Write TOML manually since tomllib is read-only
-        with open(self.config_path, "w") as f:
-            for section, items in data.items():
-                f.write(f"[{section}]\n")
-                for key, value in items.items():
-                    # Escape quotes in values
-                    escaped_value = value.replace('"', '\\"')
-                    f.write(f'{key} = "{escaped_value}"\n')
-                f.write("\n")
+        """Save the current configuration back to TOML file with secure escaping"""
+        save_config_securely(self.config_path, self.groups)
 
     def get_group(self, group_name: str) -> Optional[GroupData]:
         """Get a specific group by name"""
