@@ -10,6 +10,7 @@ from typing import Optional, List
 
 from shtick.shtick import ShtickManager
 from shtick.config import Config
+from shtick.security import validate_assignment, validate_config_path
 
 logger = logging.getLogger("shtick")
 
@@ -33,24 +34,8 @@ class ShtickCommands:
         return Config.get_current_shell()
 
     def validate_assignment(self, assignment: str) -> tuple[str, str]:
-        """Validate key=value assignment format and return key, value"""
-        if "=" not in assignment:
-            raise ValueError("Assignment must be in format key=value")
-
-        key, value = assignment.split("=", 1)
-        key = key.strip()
-        value = value.strip()
-
-        if not key or not value:
-            raise ValueError("Both key and value must be non-empty")
-
-        # Validate key format (basic shell identifier rules)
-        if not key.replace("_", "").replace("-", "").isalnum():
-            raise ValueError(
-                "Key must contain only letters, numbers, underscores, and hyphens"
-            )
-
-        return key, value
+        """Use secure validation from security module"""
+        return validate_assignment(assignment)
 
     def offer_auto_source(self):
         """Offer to source shtick in current shell session"""
@@ -202,8 +187,10 @@ class ShtickCommands:
         """Generate shell files from config"""
         try:
             if config_path:
+                # Validate path for security
+                validated_path = validate_config_path(config_path)
                 # Create a new manager with custom config path
-                manager = ShtickManager(config_path=config_path)
+                manager = ShtickManager(config_path=validated_path)
             else:
                 manager = self.manager
 

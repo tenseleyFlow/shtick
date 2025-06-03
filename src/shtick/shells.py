@@ -1,121 +1,139 @@
 """
-Shell syntax definitions for shtick
+Shell syntax definitions for shtick - SECURE VERSION
 """
+
+import shlex
+from typing import Callable
 
 
 class ShellSyntax:
-    """Holds syntax patterns for different shell types"""
+    """Holds syntax patterns for different shell types with secure escaping"""
 
-    def __init__(self, name, alias_fmt, env_fmt, function_fmt):
+    def __init__(
+        self,
+        name: str,
+        alias_fmt: Callable[[str, str], str],
+        env_fmt: Callable[[str, str], str],
+        function_fmt: Callable[[str, str], str],
+    ):
         self.name = name
         self.alias_fmt = alias_fmt
         self.env_fmt = env_fmt
         self.function_fmt = function_fmt
 
 
-# Shell syntax table - using the most natural syntax for each type
+# Helper function for safe function body handling
+def escape_function_body(body: str) -> str:
+    """Escape function body - less aggressive than shlex.quote for function contents"""
+    # For function bodies, we need to be more careful - they often contain
+    # complex commands that shouldn't be over-escaped
+    # This is a simplified approach - in production you might want more sophisticated handling
+    return body.replace("'", "'\"'\"'")
+
+
+# Shell syntax table - using secure escaping with lambdas
 SHELLS = {
     "bash": ShellSyntax(
         "bash",
-        alias_fmt="alias {}='{}'\n",
-        env_fmt="export {}='{}'\n",
-        function_fmt="{}() {{\n    {}\n}}\n",
+        alias_fmt=lambda k, v: f"alias {shlex.quote(k)}={shlex.quote(v)}\n",
+        env_fmt=lambda k, v: f"export {shlex.quote(k)}={shlex.quote(v)}\n",
+        function_fmt=lambda k, v: f"{shlex.quote(k)}() {{\n    {escape_function_body(v)}\n}}\n",
     ),
     "zsh": ShellSyntax(
         "zsh",
-        alias_fmt="alias {}='{}'\n",
-        env_fmt="export {}='{}'\n",
-        function_fmt="{}() {{\n    {}\n}}\n",
+        alias_fmt=lambda k, v: f"alias {shlex.quote(k)}={shlex.quote(v)}\n",
+        env_fmt=lambda k, v: f"export {shlex.quote(k)}={shlex.quote(v)}\n",
+        function_fmt=lambda k, v: f"{shlex.quote(k)}() {{\n    {escape_function_body(v)}\n}}\n",
     ),
     "fish": ShellSyntax(
         "fish",
-        alias_fmt="alias {} '{}'\n",
-        env_fmt="set -x {} '{}'\n",
-        function_fmt="function {}\n    {}\nend\n",
+        alias_fmt=lambda k, v: f"alias {shlex.quote(k)} {shlex.quote(v)}\n",
+        env_fmt=lambda k, v: f"set -x {shlex.quote(k)} {shlex.quote(v)}\n",
+        function_fmt=lambda k, v: f"function {shlex.quote(k)}\n    {escape_function_body(v)}\nend\n",
     ),
     "ksh": ShellSyntax(
         "ksh",
-        alias_fmt="alias {}='{}'\n",
-        env_fmt="export {}='{}'\n",
-        function_fmt="{}() {{\n    {}\n}}\n",
+        alias_fmt=lambda k, v: f"alias {shlex.quote(k)}={shlex.quote(v)}\n",
+        env_fmt=lambda k, v: f"export {shlex.quote(k)}={shlex.quote(v)}\n",
+        function_fmt=lambda k, v: f"{shlex.quote(k)}() {{\n    {escape_function_body(v)}\n}}\n",
     ),
     "mksh": ShellSyntax(
         "mksh",
-        alias_fmt="alias {}='{}'\n",
-        env_fmt="export {}='{}'\n",
-        function_fmt="{}() {{\n    {}\n}}\n",
+        alias_fmt=lambda k, v: f"alias {shlex.quote(k)}={shlex.quote(v)}\n",
+        env_fmt=lambda k, v: f"export {shlex.quote(k)}={shlex.quote(v)}\n",
+        function_fmt=lambda k, v: f"{shlex.quote(k)}() {{\n    {escape_function_body(v)}\n}}\n",
     ),
     "yash": ShellSyntax(
         "yash",
-        alias_fmt="alias {}='{}'\n",
-        env_fmt="export {}='{}'\n",
-        function_fmt="{}() {{\n    {}\n}}\n",
+        alias_fmt=lambda k, v: f"alias {shlex.quote(k)}={shlex.quote(v)}\n",
+        env_fmt=lambda k, v: f"export {shlex.quote(k)}={shlex.quote(v)}\n",
+        function_fmt=lambda k, v: f"{shlex.quote(k)}() {{\n    {escape_function_body(v)}\n}}\n",
     ),
     "dash": ShellSyntax(
         "dash",
-        alias_fmt="alias {}='{}'\n",
-        env_fmt="export {}='{}'\n",
-        function_fmt="{}() {{\n    {}\n}}\n",
+        alias_fmt=lambda k, v: f"alias {shlex.quote(k)}={shlex.quote(v)}\n",
+        env_fmt=lambda k, v: f"export {shlex.quote(k)}={shlex.quote(v)}\n",
+        function_fmt=lambda k, v: f"{shlex.quote(k)}() {{\n    {escape_function_body(v)}\n}}\n",
     ),
     "csh": ShellSyntax(
         "csh",
-        alias_fmt="alias {} '{}'\n",
-        env_fmt="setenv {} '{}'\n",
-        function_fmt="# csh doesn't support functions - skipping {}\n",
+        alias_fmt=lambda k, v: f"alias {shlex.quote(k)} {shlex.quote(v)}\n",
+        env_fmt=lambda k, v: f"setenv {shlex.quote(k)} {shlex.quote(v)}\n",
+        function_fmt=lambda k, v: f"# csh doesn't support functions - skipping {shlex.quote(k)}\n",
     ),
     "tcsh": ShellSyntax(
         "tcsh",
-        alias_fmt="alias {} '{}'\n",
-        env_fmt="setenv {} '{}'\n",
-        function_fmt="# tcsh doesn't support functions - skipping {}\n",
+        alias_fmt=lambda k, v: f"alias {shlex.quote(k)} {shlex.quote(v)}\n",
+        env_fmt=lambda k, v: f"setenv {shlex.quote(k)} {shlex.quote(v)}\n",
+        function_fmt=lambda k, v: f"# tcsh doesn't support functions - skipping {shlex.quote(k)}\n",
     ),
     "xonsh": ShellSyntax(
         "xonsh",
-        alias_fmt="aliases['{}'] = '{}'\n",
-        env_fmt="${} = '{}'\n",
-        function_fmt="def {}():\n    return '{}'\n",
+        alias_fmt=lambda k, v: f"aliases[{shlex.quote(k)}] = {shlex.quote(v)}\n",
+        env_fmt=lambda k, v: f"${{{shlex.quote(k)}}} = {shlex.quote(v)}\n",
+        function_fmt=lambda k, v: f"def {shlex.quote(k)}():\n    return {shlex.quote(v)}\n",
     ),
     "elvish": ShellSyntax(
         "elvish",
-        alias_fmt="fn {} {{ {} }}\n",
-        env_fmt="E:{} = '{}'\n",
-        function_fmt="fn {} {{ {} }}\n",
+        alias_fmt=lambda k, v: f"fn {shlex.quote(k)} {{ {escape_function_body(v)} }}\n",
+        env_fmt=lambda k, v: f"E:{shlex.quote(k)} = {shlex.quote(v)}\n",
+        function_fmt=lambda k, v: f"fn {shlex.quote(k)} {{ {escape_function_body(v)} }}\n",
     ),
     "rc": ShellSyntax(
         "rc",
-        alias_fmt="fn {} {{ {} }}\n",
-        env_fmt="{}='{}'\n",
-        function_fmt="fn {} {{ {} }}\n",
+        alias_fmt=lambda k, v: f"fn {shlex.quote(k)} {{ {escape_function_body(v)} }}\n",
+        env_fmt=lambda k, v: f"{shlex.quote(k)}={shlex.quote(v)}\n",
+        function_fmt=lambda k, v: f"fn {shlex.quote(k)} {{ {escape_function_body(v)} }}\n",
     ),
     "es": ShellSyntax(
         "es",
-        alias_fmt="fn-{} = {{ {} }}\n",
-        env_fmt="{}='{}'\n",
-        function_fmt="fn-{} = {{ {} }}\n",
+        alias_fmt=lambda k, v: f"fn-{shlex.quote(k)} = {{ {escape_function_body(v)} }}\n",
+        env_fmt=lambda k, v: f"{shlex.quote(k)}={shlex.quote(v)}\n",
+        function_fmt=lambda k, v: f"fn-{shlex.quote(k)} = {{ {escape_function_body(v)} }}\n",
     ),
     "nushell": ShellSyntax(
         "nushell",
-        alias_fmt="alias {} = {}\n",
-        env_fmt="let-env {} = '{}'\n",
-        function_fmt="def {} [] {{ {} }}\n",
+        alias_fmt=lambda k, v: f"alias {shlex.quote(k)} = {escape_function_body(v)}\n",
+        env_fmt=lambda k, v: f"let-env {shlex.quote(k)} = {shlex.quote(v)}\n",
+        function_fmt=lambda k, v: f"def {shlex.quote(k)} [] {{ {escape_function_body(v)} }}\n",
     ),
     "powershell": ShellSyntax(
         "powershell",
-        alias_fmt="Set-Alias -Name {} -Value '{}'\n",
-        env_fmt="$env:{} = '{}'\n",
-        function_fmt="function {} {{ {} }}\n",
+        alias_fmt=lambda k, v: f"Set-Alias -Name {shlex.quote(k)} -Value {shlex.quote(v)}\n",
+        env_fmt=lambda k, v: f"$env:{shlex.quote(k)} = {shlex.quote(v)}\n",
+        function_fmt=lambda k, v: f"function {shlex.quote(k)} {{ {escape_function_body(v)} }}\n",
     ),
     "oil": ShellSyntax(
         "oil",
-        alias_fmt="alias {}='{}'\n",
-        env_fmt="export {}='{}'\n",
-        function_fmt="{}() {{\n    {}\n}}\n",
+        alias_fmt=lambda k, v: f"alias {shlex.quote(k)}={shlex.quote(v)}\n",
+        env_fmt=lambda k, v: f"export {shlex.quote(k)}={shlex.quote(v)}\n",
+        function_fmt=lambda k, v: f"{shlex.quote(k)}() {{\n    {escape_function_body(v)}\n}}\n",
     ),
     "default": ShellSyntax(
         "default",
-        alias_fmt="alias {}='{}'\n",
-        env_fmt="export {}='{}'\n",
-        function_fmt="{}() {{\n    {}\n}}\n",
+        alias_fmt=lambda k, v: f"alias {shlex.quote(k)}={shlex.quote(v)}\n",
+        env_fmt=lambda k, v: f"export {shlex.quote(k)}={shlex.quote(v)}\n",
+        function_fmt=lambda k, v: f"{shlex.quote(k)}() {{\n    {escape_function_body(v)}\n}}\n",
     ),
 }
 

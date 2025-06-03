@@ -7,6 +7,7 @@ import logging
 from typing import List, Dict, Optional, Union, Tuple
 from .config import Config, GroupData
 from .generator import Generator
+from .security import validate_key, validate_value
 
 logger = logging.getLogger("shtick")
 
@@ -265,6 +266,10 @@ class ShtickManager:
     ) -> bool:
         """Generic method to add any item type"""
         try:
+            # Validate key and value for security
+            validate_key(key)
+            validate_value(value)
+
             config = self._get_config()
 
             # Use settings if check_conflicts not explicitly set
@@ -345,6 +350,10 @@ class ShtickManager:
                 key = item["key"]
                 value = item["value"]
                 check_conflicts = item.get("check_conflicts", True)
+
+                # Validate key and value for security
+                validate_key(key)
+                validate_value(value)
 
                 # Check for conflicts if requested
                 if check_conflicts:
