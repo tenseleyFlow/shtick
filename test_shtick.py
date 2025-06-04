@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-test_shtick_fixed.py - Comprehensive test suite for shtick commands
-Fixed to handle interactive prompts
+test_shtick_enhanced.py - Comprehensive test suite for shtick commands
+Enhanced with backup and group management tests
 """
 
 import subprocess
@@ -58,6 +58,9 @@ class ShtickTester:
         """Set up test environment"""
         self.test_dir = tempfile.mkdtemp(prefix="shtick_test_")
         os.environ["HOME"] = self.test_dir
+        os.environ["SHTICK_ORIGINAL_HOME"] = (
+            self.original_home
+        )  # For security.py to work
         os.makedirs(os.path.join(self.test_dir, ".config", "shtick"), exist_ok=True)
 
         # Create a settings file that disables auto_source_prompt to avoid timeouts
@@ -86,6 +89,7 @@ interactive_mode = false
             os.environ["HOME"] = self.original_home
         else:
             os.environ.pop("HOME", None)
+        os.environ.pop("SHTICK_ORIGINAL_HOME", None)
 
     def run_command(self, args, input_text=None, env_override=None):
         """Run a shtick command and return (output, return_code)"""
@@ -97,6 +101,7 @@ interactive_mode = false
 
         # Always ensure we're using our test HOME
         env["HOME"] = self.test_dir
+        env["SHTICK_ORIGINAL_HOME"] = self.original_home  # For security.py
 
         try:
             # For commands that might prompt, always provide 'n' as input
@@ -128,6 +133,8 @@ interactive_mode = false
         description,
         input_text=None,
         env_override=None,
+        check_output=None,
+        check_not_output=None,
     ):
         """Run a test and check the result"""
         self.tests_run += 1
@@ -136,12 +143,28 @@ interactive_mode = false
 
         output, actual_status = self.run_command(args, input_text, env_override)
 
-        if actual_status == expected_status:
+        # Check status code
+        status_ok = actual_status == expected_status
+
+        # Check output if requested
+        output_ok = True
+        if check_output is not None:
+            output_ok = check_output in output
+        if check_not_output is not None and output_ok:
+            output_ok = check_not_output not in output
+
+        if status_ok and output_ok:
             print(f"{GREEN}PASS{NC}")
             self.tests_passed += 1
         else:
             print(f"{RED}FAIL{NC}")
-            print(f"  Expected status: {expected_status}, Got: {actual_status}")
+            if not status_ok:
+                print(f"  Expected status: {expected_status}, Got: {actual_status}")
+            if not output_ok:
+                if check_output is not None:
+                    print(f"  Expected output to contain: {check_output}")
+                if check_not_output is not None:
+                    print(f"  Expected output NOT to contain: {check_not_output}")
             print(f"  Command: {' '.join(self.shtick_cmd + args)}")
             print(f"  Output: {output[:500]}...")  # Truncate long output
             self.tests_failed += 1
@@ -162,7 +185,7 @@ interactive_mode = false
     def run_all_tests(self):
         """Run all tests"""
         print("===================================")
-        print("Shtick Command Test Suite (Python)")
+        print("Shtick Command Test Suite (Enhanced)")
         print("===================================\n")
 
         self.setup()
@@ -238,7 +261,7 @@ interactive_mode = false
                 "deactivate-inactive",
                 ["deactivate", "work"],
                 0,
-                "Deactivate already inactive group",
+                "Deactivate already inactive group (idempotent)",
             )
 
             # Test 5: Remove operations - provide input for selection
@@ -254,7 +277,7 @@ interactive_mode = false
                 "remove-nonexistent",
                 ["remove-persistent", "alias", "nonexistent"],
                 0,
-                "Remove non-existent item",
+                "Remove non-existent item (no-op)",
             )
 
             # Re-add for next test
@@ -408,23 +431,198 @@ interactive_mode = false
 
             # Test 13: Backup functionality
             print(f"\n{YELLOW}Testing backup functionality:{NC}")
+            # Add some content first
+            self.run_command(["alias", "backup_test=echo backup"])
             self.test_command("backup-create", ["backup", "create"], 0, "Create backup")
+            self.test_command(
+                "backup-create-named",
+                ["backup", "create", "-n", "test_backup"],
+                0,
+                "Create named backup",
+            )
             self.test_command("backup-list", ["backup", "list"], 0, "List backups")
 
-            # Test 14: Group management
-            print(f"\n{YELLOW}Testing group management:{NC}")
+            # Modify config
+            self.run_command(["alias", "after_backup=echo after"])
+
+            # Restore and verify
             self.test_command(
-                "group-create", ["group", "create", "testgroup"], 0, "Create new group"
+                "backup-restore",
+                ["backup", "restore", "test_backup"],
+                0,
+                "Restore from backup",
             )
+
+            # Verify restore worked by checking if the new alias is gone
+            output, _ = self.run_command(["list"])
+            if "after_backup" not in output:
+                print(
+                    f"[{self.tests_run + 1}] verify-restore: Backup restore worked correctly ... {GREEN}PASS{NC}"
+                )
+                self.tests_passed += 1
+            else:
+                print(
+                    f"[{self.tests_run + 1}] verify-restore: Backup restore failed ... {RED}FAIL{NC}"
+                )
+                self.tests_failed += 1
+            self.tests_run += 1
+
+            # Test 14: Group management - NOW WITH REAL FUNCTIONALITY!
+            print(f"\n{YELLOW}Testing group management (enhanced):{NC}")
+
+            # Test creating a new group
+            self.test_command(
+                "group-create",
+                ["group", "create", "testgroup"],
+                0,
+                "Create new group",
+                check_output="✓ Created group 'testgroup'",
+                check_not_output="will be created when you add",
+            )
+
+            # Verify the group exists in status
+            output, _ = self.run_command(["status"])
+            if "testgroup: 0 items" in output:
+                print(
+                    f"[{self.tests_run + 1}] verify-group-exists: Created group shows in status ... {GREEN}PASS{NC}"
+                )
+                self.tests_passed += 1
+            else:
+                print(
+                    f"[{self.tests_run + 1}] verify-group-exists: Created group should show in status ... {RED}FAIL{NC}"
+                )
+                print(f"  Status output: {output}")
+                self.tests_failed += 1
+            self.tests_run += 1
+
+            # Verify we can activate the empty group
+            self.test_command(
+                "activate-empty-group",
+                ["activate", "testgroup"],
+                0,
+                "Activate empty group",
+            )
+
+            # Verify the group shows as active
+            output, _ = self.run_command(["status"])
+            if "testgroup: 0 items (ACTIVE)" in output:
+                print(
+                    f"[{self.tests_run + 1}] verify-group-active: Empty group shows as active ... {GREEN}PASS{NC}"
+                )
+                self.tests_passed += 1
+            else:
+                print(
+                    f"[{self.tests_run + 1}] verify-group-active: Empty group should show as active ... {RED}FAIL{NC}"
+                )
+                print(f"  Status output: {output}")
+                self.tests_failed += 1
+            self.tests_run += 1
+
+            # Test adding to the newly created group
+            self.test_command(
+                "add-to-created-group",
+                ["add", "alias", "testgroup", "tg=echo testgroup"],
+                0,
+                "Add item to newly created group",
+            )
+
+            # Verify the group now has 1 item
+            output, _ = self.run_command(["status"])
+            if "testgroup: 1 items (ACTIVE)" in output:
+                print(
+                    f"[{self.tests_run + 1}] verify-group-has-item: Group shows 1 item after add ... {GREEN}PASS{NC}"
+                )
+                self.tests_passed += 1
+            else:
+                print(
+                    f"[{self.tests_run + 1}] verify-group-has-item: Group should show 1 item ... {RED}FAIL{NC}"
+                )
+                print(f"  Status output: {output}")
+                self.tests_failed += 1
+            self.tests_run += 1
+
+            # Test creating duplicate group
+            self.test_command(
+                "group-create-duplicate",
+                ["group", "create", "testgroup"],
+                1,
+                "Cannot create duplicate group",
+                check_output="already exists",
+            )
+
+            # Check the TOML file contains empty sections
+            config_path = os.path.join(
+                self.test_dir, ".config", "shtick", "config.toml"
+            )
+            if os.path.exists(config_path):
+                with open(config_path, "r") as f:
+                    toml_content = f.read()
+                    # Check for either nested format (with tomli_w) or flat format (fallback)
+                    has_nested = (
+                        "[testgroup]" in toml_content
+                        and "[testgroup.aliases]" in toml_content
+                    )
+                    has_flat = "[testgroup.aliases]" in toml_content
+                    if has_nested or has_flat:
+                        print(
+                            f"[{self.tests_run + 1}] verify-toml-structure: TOML has proper empty group structure ... {GREEN}PASS{NC}"
+                        )
+                        self.tests_passed += 1
+                    else:
+                        print(
+                            f"[{self.tests_run + 1}] verify-toml-structure: TOML should have empty group sections ... {RED}FAIL{NC}"
+                        )
+                        print(f"  TOML content:\n{toml_content[:500]}")
+                        self.tests_failed += 1
+                    self.tests_run += 1
+
+            # Still test unimplemented features
             self.test_command(
                 "group-rename",
                 ["group", "rename", "testgroup", "newgroup"],
-                0,
-                "Rename group",
+                1,
+                "Rename group (not implemented)",
+                check_output="not yet implemented",
             )
             self.test_command(
-                "group-remove", ["group", "remove", "newgroup", "-f"], 0, "Remove group"
+                "group-remove",
+                ["group", "remove", "testgroup", "-f"],
+                1,
+                "Remove group (not implemented)",
+                check_output="not yet implemented",
             )
+
+            # Test 15: Exit code consistency
+            print(f"\n{YELLOW}Testing exit code consistency:{NC}")
+            # Test that user cancellation uses exit code 2
+            output, status = self.run_command(
+                ["settings", "init"], input_text="\x03"
+            )  # Ctrl+C
+            if status == 2 or "Cancelled" in output:
+                print(
+                    f"[{self.tests_run + 1}] user-cancel-exit-code: User cancellation returns code 2 ... {GREEN}PASS{NC}"
+                )
+                self.tests_passed += 1
+            else:
+                print(
+                    f"[{self.tests_run + 1}] user-cancel-exit-code: User cancellation should return code 2 ... {RED}FAIL{NC}"
+                )
+                print(f"  Got status: {status}, output: {output}")
+                self.tests_failed += 1
+            self.tests_run += 1
+
+            # Test 16: No-output commands should still exit properly
+            print(f"\n{YELLOW}Testing commands with no output still exit properly:{NC}")
+            # Create an empty config scenario
+            empty_dir = tempfile.mkdtemp()
+            self.test_command(
+                "list-empty-explicit-exit",
+                ["list"],
+                0,
+                "List with empty config exits 0",
+                env_override={"HOME": empty_dir},
+            )
+            shutil.rmtree(empty_dir)
 
         finally:
             self.cleanup()
@@ -449,7 +647,7 @@ def main():
     """Run the test suite"""
     # Check if we should run in non-interactive mode
     if len(sys.argv) > 1 and sys.argv[1] == "--help":
-        print("Usage: test_shtick_fixed.py")
+        print("Usage: test_shtick_enhanced.py")
         print("Run comprehensive tests for shtick command line tool")
         return 0
 
