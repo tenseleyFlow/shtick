@@ -582,15 +582,151 @@ class ShtickCommands:
 
     def group_rename(self, old_name: str, new_name: str):
         """Rename a group"""
-        # This would require refactoring the config to support renaming
-        # For now, just indicate it's not implemented
-        self._exit_error("Group rename is not yet implemented")
+        try:
+            # Check if old group exists
+            if old_name not in self.manager.get_groups():
+                self._exit_error(f"Group '{old_name}' not found")
+
+            # Check if new name already exists
+            if new_name in self.manager.get_groups():
+                self._exit_error(f"Group '{new_name}' already exists")
+
+            # Can't rename persistent group
+            if old_name == "persistent":
+                self._exit_error("Cannot rename the 'persistent' group")
+
+            # Get the config
+            from shtick.config import Config, GroupData
+
+            config = self.manager._get_config()
+
+            # Find the group to rename
+            old_group = None
+            for i, group in enumerate(config.groups):
+                if group.name == old_name:
+                    old_group = group
+                    # Create new group with same content but new name
+                    new_group = GroupData(
+                        name=new_name,
+                        aliases=group.aliases.copy(),
+                        env_vars=group.env_vars.copy(),
+                        functions=group.functions.copy(),
+                    )
+                    # Replace in the same position
+                    config.groups[i] = new_group
+                    break
+
+            if not old_group:
+                self._exit_error(f"Group '{old_name}' not found")
+
+            # Update active groups if needed
+            active_groups = config.load_active_groups()
+            if old_name in active_groups:
+                active_groups.remove(old_name)
+                active_groups.append(new_name)
+                config.save_active_groups(active_groups)
+
+            # Save config
+            config.save()
+
+            # Rename the directory of generated files
+            old_dir = os.path.join(config.get_output_dir(), old_name)
+            new_dir = os.path.join(config.get_output_dir(), new_name)
+            if os.path.exists(old_dir):
+                os.rename(old_dir, new_dir)
+
+            # Regenerate loader if group was active
+            if new_name in active_groups:
+                self.manager._generator.generate_loader(config)
+
+            print(f"✓ Renamed group '{old_name}' to '{new_name}'")
+
+            if new_name in active_groups:
+                print(f"\nGroup '{new_name}' is still active")
+                print("Run 'shtick generate' to update shell files")
+
+            self._exit_success()
+        except Exception as e:
+            self._exit_error(f"Failed to rename group: {e}")
 
     def group_remove(self, name: str, force: bool = False):
         """Remove a group"""
-        # This would require refactoring the config to support group removal
-        # For now, just indicate it's not implemented
-        self._exit_error("Group removal is not yet implemented")
+        try:
+            # Check if group exists
+            if name not in self.manager.get_groups():
+                self._exit_error(f"Group '{name}' not found")
+
+            # Can't remove persistent group
+            if name == "persistent":
+                self._exit_error("Cannot remove the 'persistent' group")
+
+            # Get the config
+            from shtick.config import Config
+
+            config = self.manager._get_config()
+
+            # Find the group
+            group = config.get_group(name)
+            if not group:
+                self._exit_error(f"Group '{name}' not found")
+
+            # Check if group has items and confirm if not forced
+            if group.total_items > 0 and not force:
+                print(f"Group '{name}' contains {group.total_items} items:")
+                print(f"  - {len(group.aliases)} aliases")
+                print(f"  - {len(group.env_vars)} environment variables")
+                print(f"  - {len(group.functions)} functions")
+
+                try:
+                    response = (
+                        input(
+                            f"\nAre you sure you want to remove group '{name}'? [y/N]: "
+                        )
+                        .strip()
+                        .lower()
+                    )
+                    if response not in ["y", "yes"]:
+                        print("Cancelled")
+                        self._exit_success()
+                except (KeyboardInterrupt, EOFError):
+                    print("\nCancelled")
+                    self._exit_success()
+
+            # Remove from groups list
+            config.groups = [g for g in config.groups if g.name != name]
+
+            # Remove from active groups if present
+            active_groups = config.load_active_groups()
+            was_active = name in active_groups
+            if was_active:
+                active_groups.remove(name)
+                config.save_active_groups(active_groups)
+
+            # Save config
+            config.save()
+
+            # Remove generated files directory
+            group_dir = os.path.join(config.get_output_dir(), name)
+            if os.path.exists(group_dir):
+                import shutil
+
+                shutil.rmtree(group_dir)
+
+            # Regenerate loader if group was active
+            if was_active:
+                self.manager._generator.generate_loader(config)
+
+            print(f"✓ Removed group '{name}'")
+
+            if was_active:
+                print(
+                    "\nGroup was active - changes will take effect in new shell sessions"
+                )
+                self.offer_auto_source()
+
+            self._exit_success()
+        except Exception as e:
+            self._exit_error(f"Failed to remove group: {e}")
 
     # Backup commands
     def backup_create(self, name: str = None):

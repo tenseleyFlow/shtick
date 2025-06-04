@@ -470,3 +470,9 @@ class Config:
             f"Auto-detected shells based on current shell '{current_shell}': {shells}"
         )
         return list(set(shells))  # Remove duplicates
+
+    def remove_group(self, group_name: str) -> bool:
+        """Remove a group by name. Returns True if removed."""
+        initial_count = len(self.groups)
+        self.groups = [g for g in self.groups if g.name != group_name]
+        return len(self.groups) < initial_count
