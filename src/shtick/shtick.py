@@ -592,6 +592,94 @@ class ShtickManager:
             logger.error(f"Error generating shell files: {e}")
             return False
 
+    def backup_config(self, backup_name: str = None) -> str:
+        """Create a backup of current configuration"""
+        import shutil
+        from datetime import datetime
+
+        config = self._get_config()
+        backup_dir = os.path.join(os.path.dirname(config.config_path), "backups")
+        os.makedirs(backup_dir, exist_ok=True)
+
+        if backup_name:
+            backup_filename = f"config_{backup_name}.toml"
+        else:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_filename = f"config_backup_{timestamp}.toml"
+
+        backup_path = os.path.join(backup_dir, backup_filename)
+
+        # Copy current config
+        if os.path.exists(config.config_path):
+            shutil.copy2(config.config_path, backup_path)
+            return backup_path
+        else:
+            raise FileNotFoundError("No config file to backup")
+
+    def list_backups(self) -> List[Dict[str, str]]:
+        """List all available backups"""
+        config = self._get_config()
+        backup_dir = os.path.join(os.path.dirname(config.config_path), "backups")
+
+        if not os.path.exists(backup_dir):
+            return []
+
+        backups = []
+        for file in sorted(os.listdir(backup_dir), reverse=True):
+            if file.endswith(".toml"):
+                file_path = os.path.join(backup_dir, file)
+                stat = os.stat(file_path)
+                backups.append(
+                    {
+                        "name": file,
+                        "path": file_path,
+                        "size": stat.st_size,
+                        "modified": stat.st_mtime,
+                    }
+                )
+
+        return backups
+
+    def restore_backup(self, backup_name: str) -> bool:
+        """Restore configuration from a backup"""
+        import shutil
+
+        config = self._get_config()
+        backup_dir = os.path.join(os.path.dirname(config.config_path), "backups")
+
+        # Find backup file - try multiple naming patterns
+        backup_path = None
+        possible_names = [
+            backup_name,  # exact name
+            f"{backup_name}.toml",  # add extension
+            f"config_{backup_name}",  # add prefix
+            f"config_{backup_name}.toml",  # add both
+        ]
+
+        for name in possible_names:
+            full_path = os.path.join(backup_dir, name)
+            if os.path.exists(full_path):
+                backup_path = full_path
+                break
+
+        if not backup_path:
+            return False
+
+        # Create backup of current before restoring
+        try:
+            self.backup_config("before_restore")
+        except:
+            pass  # Current config might not exist
+
+        # Restore
+        shutil.copy2(backup_path, config.config_path)
+
+        # Reload config and regenerate
+        self._load_config(create_if_missing=False)
+        self.generate_shell_files()
+
+        return True
+
     def get_source_command(self, shell: Optional[str] = None) -> Optional[str]:
         """
         Get the source command for loading shtick in current session.

@@ -116,6 +116,54 @@ def main():
         help="Show one shell per line instead of columns",
     )
 
+    # Add group management commands
+    group_parser = subparsers.add_parser("group", help="Group management commands")
+    group_subparsers = group_parser.add_subparsers(
+        dest="group_command", help="Group commands"
+    )
+
+    # Create group
+    create_parser = group_subparsers.add_parser("create", help="Create a new group")
+    create_parser.add_argument("name", help="Group name")
+    create_parser.add_argument("-d", "--description", help="Group description")
+
+    # Remove group
+    remove_parser = group_subparsers.add_parser("remove", help="Remove a group")
+    remove_parser.add_argument("name", help="Group name")
+    remove_parser.add_argument(
+        "-f", "--force", action="store_true", help="Force removal without confirmation"
+    )
+
+    # Rename group
+    rename_parser = group_subparsers.add_parser("rename", help="Rename a group")
+    rename_parser.add_argument("old_name", help="Current group name")
+    rename_parser.add_argument("new_name", help="New group name")
+
+    # Backup commands
+    backup_parser = subparsers.add_parser("backup", help="Backup management commands")
+    backup_subparsers = backup_parser.add_subparsers(
+        dest="backup_command", help="Backup commands"
+    )
+
+    # Create backup
+    backup_create_parser = backup_subparsers.add_parser(
+        "create", help="Create a backup"
+    )
+    backup_create_parser.add_argument(
+        "-n", "--name", help="Backup name (timestamp used if not provided)"
+    )
+
+    # List backups
+    backup_list_parser = backup_subparsers.add_parser(
+        "list", help="List available backups"
+    )
+
+    # Restore backup
+    backup_restore_parser = backup_subparsers.add_parser(
+        "restore", help="Restore from backup"
+    )
+    backup_restore_parser.add_argument("name", help="Backup name or filename")
+
     # Source command (for eval)
     source_parser = subparsers.add_parser(
         "source", help="Output source command for eval (for immediate loading)"
@@ -204,11 +252,29 @@ def main():
                 commands.settings_set(args.key, args.value)
             else:
                 settings_parser.print_help()
+        elif args.command == "group":
+            if args.group_command == "create":
+                commands.group_create(args.name, args.description)
+            elif args.group_command == "rename":
+                commands.group_rename(args.old_name, args.new_name)
+            elif args.group_command == "remove":
+                commands.group_remove(args.name, args.force)
+            else:
+                group_parser.print_help()
+        elif args.command == "backup":
+            if args.backup_command == "create":
+                commands.backup_create(args.name)
+            elif args.backup_command == "list":
+                commands.backup_list()
+            elif args.backup_command == "restore":
+                commands.backup_restore(args.name)
+            else:
+                backup_parser.print_help()
 
     except KeyboardInterrupt:
         logger.debug("Operation cancelled by user")
         print("\nCancelled")
-        sys.exit(1)
+        sys.exit(2)  # Use exit code 2 for user cancellation
     except Exception as e:
         if args.debug:
             logger.exception("Unhandled exception")

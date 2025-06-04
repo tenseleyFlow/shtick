@@ -75,42 +75,45 @@ def save_config_securely(config_path: str, groups) -> None:
         data = {}
         for group in groups:
             group_data = {}
-            if group.aliases:
-                group_data["aliases"] = group.aliases
-            if group.env_vars:
-                group_data["env_vars"] = group.env_vars
-            if group.functions:
-                group_data["functions"] = group.functions
-            if group_data:
-                data[group.name] = group_data
+            # Always include the sections, even if empty
+            group_data["aliases"] = group.aliases if group.aliases else {}
+            group_data["env_vars"] = group.env_vars if group.env_vars else {}
+            group_data["functions"] = group.functions if group.functions else {}
+            data[group.name] = group_data
 
         with open(config_path, "wb") as f:
             tomli_w.dump(data, f)
 
     except ImportError:
-        # Fallback with proper escaping
-        data = {}
-        for group in groups:
-            if group.aliases:
-                data[f"{group.name}.aliases"] = group.aliases
-            if group.env_vars:
-                data[f"{group.name}.env_vars"] = group.env_vars
-            if group.functions:
-                data[f"{group.name}.functions"] = group.functions
-
-        # Write TOML manually with proper escaping
+        # Enhanced fallback that writes proper nested TOML structure
         with open(config_path, "w") as f:
-            # Sort sections for consistent output
-            for section in sorted(data.keys()):
-                items = data[section]
-                f.write(f"[{section}]\n")
-                # Sort items within section
-                for key in sorted(items.keys()):
-                    value = items[key]
-                    # Use proper TOML escaping
+            # Write each group
+            for group in groups:
+                # Write main group header
+                f.write(f"[{group.name}]\n")
+
+                # Write aliases section
+                f.write(f"[{group.name}.aliases]\n")
+                for key in sorted(group.aliases.keys()):
+                    value = group.aliases[key]
                     escaped_value = escape_toml_value(value)
                     f.write(f"{key} = {escaped_value}\n")
-                f.write("\n")
+
+                # Write env_vars section
+                f.write(f"\n[{group.name}.env_vars]\n")
+                for key in sorted(group.env_vars.keys()):
+                    value = group.env_vars[key]
+                    escaped_value = escape_toml_value(value)
+                    f.write(f"{key} = {escaped_value}\n")
+
+                # Write functions section
+                f.write(f"\n[{group.name}.functions]\n")
+                for key in sorted(group.functions.keys()):
+                    value = group.functions[key]
+                    escaped_value = escape_toml_value(value)
+                    f.write(f"{key} = {escaped_value}\n")
+
+                f.write("\n")  # Empty line between groups
 
 
 @dataclass
@@ -335,7 +338,7 @@ class Config:
                         f"Unknown or invalid section '{section_name}' in group '{group_name}'"
                     )
 
-            # Create GroupData object if group has any items
+            # Create GroupData object (allow empty groups)
             new_group = GroupData(
                 name=group_name,
                 aliases=group_data["aliases"],
@@ -343,14 +346,16 @@ class Config:
                 functions=group_data["functions"],
             )
 
+            # Always add the group, even if empty
+            self.groups.append(new_group)
+
             if new_group.total_items > 0:
-                self.groups.append(new_group)
                 logger.debug(
                     f"Created group '{group_name}' with {len(group_data['aliases'])} aliases, "
                     f"{len(group_data['env_vars'])} env_vars, {len(group_data['functions'])} functions"
                 )
             else:
-                logger.warning(f"Group '{group_name}' has no items, skipping")
+                logger.debug(f"Created empty group '{group_name}'")
 
         logger.debug(
             f"Final groups loaded: {[g.name for g in self.groups]} (total: {len(self.groups)})"
@@ -358,6 +363,39 @@ class Config:
 
     def save(self) -> None:
         """Save the current configuration back to TOML file with secure escaping"""
+        # Check if we should backup
+        from .settings import Settings
+
+        settings = Settings()
+
+        if settings.behavior.backup_on_save and os.path.exists(self.config_path):
+            # Create automatic backup
+            from datetime import datetime
+
+            backup_dir = os.path.join(os.path.dirname(self.config_path), "backups")
+            os.makedirs(backup_dir, exist_ok=True)
+
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_path = os.path.join(backup_dir, f"config_auto_{timestamp}.toml")
+
+            import shutil
+
+            shutil.copy2(self.config_path, backup_path)
+            logger.debug(f"Created automatic backup: {backup_path}")
+
+            # Clean up old auto backups (keep last 10)
+            auto_backups = sorted(
+                [
+                    f
+                    for f in os.listdir(backup_dir)
+                    if f.startswith("config_auto_") and f.endswith(".toml")
+                ]
+            )
+            if len(auto_backups) > 10:
+                for old_backup in auto_backups[:-10]:
+                    os.remove(os.path.join(backup_dir, old_backup))
+
+        # Save normally
         save_config_securely(self.config_path, self.groups)
 
     def get_group(self, group_name: str) -> Optional[GroupData]:

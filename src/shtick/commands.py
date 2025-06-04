@@ -1,5 +1,5 @@
 """
-Command implementations for shtick CLI - REFACTORED to use ShtickManager
+Command implementations for shtick CLI - FIXED WITH CONSISTENT RETURN STATUSES
 """
 
 import os
@@ -16,7 +16,7 @@ logger = logging.getLogger("shtick")
 
 
 class ShtickCommands:
-    """Central command handler for shtick operations - now using ShtickManager"""
+    """Central command handler for shtick operations - with consistent return codes"""
 
     def __init__(self, debug: bool = False):
         # Set up logging based on debug flag
@@ -28,6 +28,17 @@ class ShtickCommands:
             logging.basicConfig(level=logging.INFO, format="%(message)s")
 
         self.manager = ShtickManager(debug=debug)
+
+    def _exit_error(self, message: str, code: int = 1):
+        """Print error message and exit with given code"""
+        print(f"Error: {message}")
+        sys.exit(code)
+
+    def _exit_success(self, message: str = None, code: int = 0):
+        """Print optional success message and exit with code"""
+        if message:
+            print(message)
+        sys.exit(code)
 
     def get_current_shell(self) -> Optional[str]:
         """Use cached shell detection from Config"""
@@ -182,40 +193,43 @@ class ShtickCommands:
             logger.error(f"Failed to create {primary_config}: {e}")
             return False
 
-    # Command implementations - now using ShtickManager
+    # Command implementations - now with consistent return statuses
     def generate(self, config_path: str = None, terse: bool = False):
         """Generate shell files from config"""
         try:
             if config_path:
-                # Validate path for security
-                validated_path = validate_config_path(config_path)
+                # Validate path for security with relaxed rules for generate
+                validated_path = validate_config_path(config_path, for_generate=True)
+
+                # Warn about custom config behavior
+                if not terse:
+                    print("Note: Generating from custom config file")
+                    print("This will overwrite files but won't affect active groups")
+
                 # Create a new manager with custom config path
                 manager = ShtickManager(config_path=validated_path)
             else:
                 manager = self.manager
 
             success = manager.generate_shell_files()
-            if success and not terse:
-                self.check_shell_integration()
-            elif not success:
-                print("Error: Failed to generate shell files")
-                sys.exit(1)
+            if success:
+                if not terse:
+                    self.check_shell_integration()
+                self._exit_success()  # Explicit success
+            else:
+                self._exit_error("Failed to generate shell files")
 
         except FileNotFoundError as e:
-            print(f"Error: {e}")
-            print(f"Create a config file first")
-            sys.exit(1)
+            self._exit_error(f"{e}\nCreate a config file first")
         except Exception as e:
-            print(f"Error: {e}")
-            sys.exit(1)
+            self._exit_error(str(e))
 
     def add_item(self, item_type: str, group: str, assignment: str):
         """Add an item to a specific group"""
         try:
             key, value = self.validate_assignment(assignment)
         except ValueError as e:
-            print(f"Error: {e}")
-            sys.exit(1)
+            self._exit_error(str(e))
 
         # Dispatch to appropriate manager method
         if item_type == "alias":
@@ -225,8 +239,7 @@ class ShtickCommands:
         elif item_type == "function":
             success = self.manager.add_function(key, value, group)
         else:
-            print(f"Error: Unknown item type '{item_type}'")
-            sys.exit(1)
+            self._exit_error(f"Unknown item type '{item_type}'")
 
         if success:
             print(f"✓ Added {item_type} '{key}' = '{value}' to group '{group}'")
@@ -236,17 +249,16 @@ class ShtickCommands:
                 and group in self.manager.get_active_groups()
             ):
                 self.offer_auto_source()
+            self._exit_success()  # Explicit success
         else:
-            print(f"Error: Failed to add {item_type}")
-            sys.exit(1)
+            self._exit_error(f"Failed to add {item_type}")
 
     def add_persistent(self, item_type: str, assignment: str):
         """Add an item to the persistent group"""
         try:
             key, value = self.validate_assignment(assignment)
         except ValueError as e:
-            print(f"Error: {e}")
-            sys.exit(1)
+            self._exit_error(str(e))
 
         is_first_time = not os.path.exists(Config.get_default_config_path())
 
@@ -258,8 +270,7 @@ class ShtickCommands:
         elif item_type == "function":
             success = self.manager.add_persistent_function(key, value)
         else:
-            print(f"Error: Unknown item type '{item_type}'")
-            sys.exit(1)
+            self._exit_error(f"Unknown item type '{item_type}'")
 
         if success:
             print(
@@ -271,9 +282,10 @@ class ShtickCommands:
             if is_first_time:
                 print("\n🎉 Welcome to shtick!")
                 self.check_shell_integration()
+
+            self._exit_success()  # Explicit success
         else:
-            print(f"Error: Failed to add {item_type}")
-            sys.exit(1)
+            self._exit_error(f"Failed to add {item_type}")
 
     def remove_item(self, item_type: str, group: str, search: str):
         """Remove an item from a group"""
@@ -290,12 +302,12 @@ class ShtickCommands:
                 print(
                     f"No {item_type} items matching '{search}' found in group '{group}'"
                 )
-                return
+                self._exit_success()  # Not an error - nothing to remove
 
             # Handle single vs multiple matches
             item_to_remove = self._select_item_to_remove(matches)
             if not item_to_remove:
-                return
+                self._exit_success()  # User cancelled - not an error
 
             # Dispatch to appropriate manager method
             if item_type == "alias":
@@ -305,20 +317,19 @@ class ShtickCommands:
             elif item_type == "function":
                 success = self.manager.remove_function(item_to_remove, group)
             else:
-                print(f"Error: Unknown item type '{item_type}'")
-                return
+                self._exit_error(f"Unknown item type '{item_type}'")
 
             if success:
                 print(f"✓ Removed {item_type} '{item_to_remove}' from group '{group}'")
                 # Offer to source if group is active
                 if group == "persistent" or group in self.manager.get_active_groups():
                     self.offer_auto_source()
+                self._exit_success()  # Explicit success
             else:
-                print(f"Failed to remove {item_type} '{item_to_remove}'")
+                self._exit_error(f"Failed to remove {item_type} '{item_to_remove}'")
 
         except Exception as e:
-            print(f"Error: {e}")
-            sys.exit(1)
+            self._exit_error(str(e))
 
     def _select_item_to_remove(self, matches: List[str]) -> Optional[str]:
         """Handle selection of item to remove from matches"""
@@ -349,27 +360,29 @@ class ShtickCommands:
     def activate_group(self, group_name: str):
         """Activate a group"""
         if group_name == "persistent":
-            print(
-                "Error: 'persistent' group is always active and cannot be manually activated"
+            self._exit_error(
+                "'persistent' group is always active and cannot be manually activated"
             )
-            return
 
         success = self.manager.activate_group(group_name)
         if success:
             print(f"✓ Activated group '{group_name}'")
             print("Changes are now active in new shell sessions")
             self.offer_auto_source()
+            self._exit_success()  # Explicit success
         else:
-            print(f"Error: Group '{group_name}' not found in configuration")
             available = self.manager.get_groups()
             if available:
-                print(f"Available groups: {', '.join(available)}")
+                self._exit_error(
+                    f"Group '{group_name}' not found. Available groups: {', '.join(available)}"
+                )
+            else:
+                self._exit_error(f"Group '{group_name}' not found in configuration")
 
     def deactivate_group(self, group_name: str):
         """Deactivate a group"""
         if group_name == "persistent":
-            print("Error: 'persistent' group cannot be deactivated")
-            return
+            self._exit_error("'persistent' group cannot be deactivated")
 
         success = self.manager.deactivate_group(group_name)
         if success:
@@ -378,6 +391,9 @@ class ShtickCommands:
             self.offer_auto_source()
         else:
             print(f"Group '{group_name}' was not active")
+            # Not an error - deactivating inactive group is idempotent
+
+        self._exit_success()  # Always exit success for idempotent operation
 
     def source_command(self, shell: str = None):
         """Output source command for eval"""
@@ -397,6 +413,7 @@ class ShtickCommands:
 
         # Output the source command that can be eval'd
         print(f"source {loader_path}")
+        self._exit_success()  # Explicit success
 
     # Settings commands
     def settings_init(self):
@@ -414,14 +431,15 @@ class ShtickCommands:
                 )
                 if response not in ["y", "yes"]:
                     print("Cancelled")
-                    return
+                    self._exit_success()  # User cancelled - not an error
             except (KeyboardInterrupt, EOFError):
                 print("\nCancelled")
-                return
+                self._exit_error("Operation cancelled by user", code=2)
 
         settings.create_default_settings_file()
         print(f"✓ Created settings file at {settings._settings_path}")
         print("\nYou can now customize your shtick behavior by editing this file.")
+        self._exit_success()  # Explicit success
 
     def settings_show(self):
         """Show current settings"""
@@ -453,6 +471,8 @@ class ShtickCommands:
             print("(No settings file found - using defaults)")
             print("Run 'shtick settings init' to create one")
 
+        self._exit_success()  # Explicit success
+
     def settings_set(self, key: str, value: str):
         """Set a specific setting value"""
         from shtick.settings import Settings
@@ -462,19 +482,17 @@ class ShtickCommands:
         # Parse the key (e.g., "generation.shells")
         parts = key.split(".")
         if len(parts) != 2:
-            print(
-                f"Error: Invalid key format. Use 'section.key' (e.g., 'generation.shells')"
+            self._exit_error(
+                "Invalid key format. Use 'section.key' (e.g., 'generation.shells')"
             )
-            sys.exit(1)
 
         section, setting_key = parts
 
         # Validate section
         if section not in ["generation", "behavior", "performance"]:
-            print(
-                f"Error: Invalid section '{section}'. Must be one of: generation, behavior, performance"
+            self._exit_error(
+                f"Invalid section '{section}'. Must be one of: generation, behavior, performance"
             )
-            sys.exit(1)
 
         # Get the section object
         section_obj = getattr(settings, section)
@@ -483,7 +501,7 @@ class ShtickCommands:
         if not hasattr(section_obj, setting_key):
             print(f"Error: Invalid key '{setting_key}' for section '{section}'")
             print(f"Valid keys: {', '.join(vars(section_obj).keys())}")
-            sys.exit(1)
+            self._exit_error(f"Invalid key '{setting_key}'")
 
         # Parse the value based on type
         current_value = getattr(section_obj, setting_key)
@@ -517,14 +535,109 @@ class ShtickCommands:
                 # String value
                 parsed_value = value
         except Exception as e:
-            print(f"Error parsing value: {e}")
-            sys.exit(1)
+            self._exit_error(f"Error parsing value: {e}")
 
         # Set the value
         setattr(section_obj, setting_key, parsed_value)
 
         # Save settings
-        settings.save()
+        try:
+            settings.save()
+            print(f"✓ Set {key} = {parsed_value}")
+            print(f"Settings saved to {settings._settings_path}")
+            self._exit_success()  # Explicit success
+        except Exception as e:
+            self._exit_error(f"Failed to save settings: {e}")
 
-        print(f"✓ Set {key} = {parsed_value}")
-        print(f"Settings saved to {settings._settings_path}")
+    # Group management commands
+    def group_create(self, name: str, description: str = None):
+        """Create a new group"""
+        try:
+            # Check if group already exists
+            if self.manager.get_groups() and name in self.manager.get_groups():
+                self._exit_error(f"Group '{name}' already exists")
+
+            # Actually create the empty group
+            from shtick.config import Config, GroupData
+
+            config = self.manager._get_config()
+
+            # Add the new empty group
+            new_group = GroupData(name=name, aliases={}, env_vars={}, functions={})
+            config.groups.append(new_group)
+
+            # Save the config with the new empty group
+            config.save()
+
+            print(f"✓ Created group '{name}'")
+            print(f"\nAdd items to this group with:")
+            print(f"  shtick add alias {name} ll='ls -la'")
+            print(f"  shtick add env {name} DEBUG=1")
+            print(f"\nActivate with:")
+            print(f"  shtick activate {name}")
+
+            self._exit_success()
+        except Exception as e:
+            self._exit_error(str(e))
+
+    def group_rename(self, old_name: str, new_name: str):
+        """Rename a group"""
+        # This would require refactoring the config to support renaming
+        # For now, just indicate it's not implemented
+        self._exit_error("Group rename is not yet implemented")
+
+    def group_remove(self, name: str, force: bool = False):
+        """Remove a group"""
+        # This would require refactoring the config to support group removal
+        # For now, just indicate it's not implemented
+        self._exit_error("Group removal is not yet implemented")
+
+    # Backup commands
+    def backup_create(self, name: str = None):
+        """Create a backup"""
+        try:
+            backup_path = self.manager.backup_config(name)
+            print(f"✓ Created backup: {backup_path}")
+            self._exit_success()
+        except Exception as e:
+            self._exit_error(f"Failed to create backup: {e}")
+
+    def backup_list(self):
+        """List available backups"""
+        try:
+            backups = self.manager.list_backups()
+            if not backups:
+                print("No backups found")
+            else:
+                print("Available backups:")
+                for backup in backups:
+                    from datetime import datetime
+
+                    mtime = datetime.fromtimestamp(backup["modified"]).strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    )
+                    size_kb = backup["size"] / 1024
+                    print(f"  {backup['name']} ({size_kb:.1f} KB, modified: {mtime})")
+            self._exit_success()
+        except Exception as e:
+            self._exit_error(f"Failed to list backups: {e}")
+
+    def backup_restore(self, name: str):
+        """Restore from backup"""
+        try:
+            if self.manager.restore_backup(name):
+                print(f"✓ Restored from backup: {name}")
+                print("Run 'shtick generate' to regenerate shell files")
+                self._exit_success()
+            else:
+                self._exit_error(f"Backup '{name}' not found")
+        except Exception as e:
+            self._exit_error(f"Failed to restore backup: {e}")
+
+
+# Return code conventions:
+# 0 - Success
+# 1 - General error (invalid arguments, missing files, etc.)
+# 2 - User cancelled operation
+# 3 - Permission denied (currently not used, but reserved)
+# 4 - Resource not found when it should exist (currently not used, but reserved)
