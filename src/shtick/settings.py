@@ -17,7 +17,7 @@ class GenerationSettings:
     """Settings for file generation"""
 
     shells: List[str] = field(default_factory=list)  # Empty = auto-detect
-    parallel: bool = False  # Threading not implemented yet
+    parallel: bool = False  # Enable parallel generation
     consolidate_files: bool = True
 
 
@@ -29,15 +29,6 @@ class BehaviorSettings:
     check_conflicts: bool = True
     backup_on_save: bool = False
     interactive_mode: bool = True
-
-
-@dataclass
-class PerformanceSettings:
-    """Settings for performance optimization"""
-
-    cache_ttl: int = 300  # 5 minutes
-    lazy_load: bool = False  # Not implemented yet
-    batch_operations: bool = True
 
 
 class Settings:
@@ -56,7 +47,6 @@ class Settings:
         if not self._loaded:
             self.generation = GenerationSettings()
             self.behavior = BehaviorSettings()
-            self.performance = PerformanceSettings()
             self._settings_path = self.get_settings_path()
             self._load()
             Settings._loaded = True
@@ -96,15 +86,6 @@ class Settings:
                 self.behavior.backup_on_save = beh_data.get("backup_on_save", False)
                 self.behavior.interactive_mode = beh_data.get("interactive_mode", True)
 
-            # Load performance settings
-            if "performance" in data:
-                perf_data = data["performance"]
-                self.performance.cache_ttl = perf_data.get("cache_ttl", 300)
-                self.performance.lazy_load = perf_data.get("lazy_load", False)
-                self.performance.batch_operations = perf_data.get(
-                    "batch_operations", True
-                )
-
             logger.debug("Settings loaded successfully")
 
         except Exception as e:
@@ -127,11 +108,6 @@ class Settings:
                 "check_conflicts": self.behavior.check_conflicts,
                 "backup_on_save": self.behavior.backup_on_save,
                 "interactive_mode": self.behavior.interactive_mode,
-            },
-            "performance": {
-                "cache_ttl": self.performance.cache_ttl,
-                "lazy_load": self.performance.lazy_load,
-                "batch_operations": self.performance.batch_operations,
             },
         }
 
@@ -164,7 +140,7 @@ class Settings:
 [generation]
 # Shells to generate files for. Empty list = auto-detect based on current shell
 shells = []
-# Enable parallel generation (not implemented yet)
+# Enable parallel generation for faster processing with many shells
 parallel = false
 # Consolidate all items into single files per shell
 consolidate_files = true
@@ -178,14 +154,6 @@ check_conflicts = true
 backup_on_save = false
 # Enable interactive prompts
 interactive_mode = true
-
-[performance]
-# Cache time-to-live in seconds
-cache_ttl = 300
-# Enable lazy loading (not implemented yet)
-lazy_load = false
-# Enable batch operations for better performance
-batch_operations = true
 """
 
         with open(self._settings_path, "w") as f:
